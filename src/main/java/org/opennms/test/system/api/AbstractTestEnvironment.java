@@ -30,14 +30,14 @@ package org.opennms.test.system.api;
 import java.net.InetSocketAddress;
 import java.util.List;
 
-import org.opennms.test.system.api.NewTestSystem.ContainerAlias;
+import org.opennms.test.system.api.NewTestEnvironment.ContainerAlias;
 import org.opennms.test.system.api.junit.ExternalResourceRule;
 
 import com.spotify.docker.client.DockerClient;
 import com.spotify.docker.client.messages.ContainerInfo;
 import com.spotify.docker.client.messages.PortBinding;
 
-public abstract class AbstractTestSystem extends ExternalResourceRule implements TestSystem {
+public abstract class AbstractTestEnvironment extends ExternalResourceRule implements TestEnvironment {
 
     public abstract DockerClient getDockerClient();
 

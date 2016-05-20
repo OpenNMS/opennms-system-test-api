@@ -13,5 +13,8 @@ buildNumber.properties
 .settings
 .project
 
+# vim
+*.swp
+
 # Artifacts
 *.rpm

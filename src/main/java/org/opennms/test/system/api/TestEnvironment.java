@@ -31,21 +31,21 @@ import java.net.InetSocketAddress;
 import java.util.Set;
 
 import org.junit.rules.TestRule;
-import org.opennms.test.system.api.NewTestSystem.ContainerAlias;
+import org.opennms.test.system.api.NewTestEnvironment.ContainerAlias;
 
 import com.spotify.docker.client.messages.ContainerInfo;
 
 /**
  * The system test rule is responsible for ensuring that a valid
- * Minion TestSystem is setup before invoking any tests.
+ * Minion TestEnvironment is setup before invoking any tests.
  *
  * Further, the test rule must provide all of the details required
- * to communicate with the Minion TestSystem, whether it be on the current
+ * to communicate with the Minion TestEnvironment, whether it be on the current
  * or a remote host.
  * 
  * @author jwhite
  */
-public interface TestSystem extends TestRule {
+public interface TestEnvironment extends TestRule {
 
     public InetSocketAddress getServiceAddress(ContainerAlias alias, int port);
 
@@ -55,7 +55,7 @@ public interface TestSystem extends TestRule {
 
     public Set<ContainerAlias> getContainerAliases();
 
-    public static TestSystemBuilder builder() {
-        return new TestSystemBuilder();
+    public static TestEnvironmentBuilder builder() {
+        return new TestEnvironmentBuilder();
     }
 }

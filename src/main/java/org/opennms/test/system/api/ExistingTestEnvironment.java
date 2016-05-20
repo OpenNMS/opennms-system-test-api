@@ -30,7 +30,7 @@ package org.opennms.test.system.api;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.opennms.test.system.api.NewTestSystem.ContainerAlias;
+import org.opennms.test.system.api.NewTestEnvironment.ContainerAlias;
 
 import java.util.Set;
 
@@ -41,8 +41,8 @@ import com.spotify.docker.client.messages.Container;
 import com.spotify.docker.client.messages.ContainerInfo;
 
 /**
- * Used to point to any existing TestSystem that was set up with the
- * NewTestSystem(true).
+ * Used to point to any existing TestEnvironment that was set up with the
+ * NewTestEnvironment(true).
  *
  * This is particularly useful when developing tests, since the
  * containers do not need to be recreated every time.
@@ -52,7 +52,7 @@ import com.spotify.docker.client.messages.ContainerInfo;
  *
  * @author jwhite
  */
-public class ExistingTestSystem extends AbstractTestSystem implements TestSystem {
+public class ExistingTestEnvironment extends AbstractTestEnvironment implements TestEnvironment {
 
     private DockerClient docker;
 
@@ -62,7 +62,7 @@ public class ExistingTestSystem extends AbstractTestSystem implements TestSystem
     protected void before() throws Throwable {
         // Invert the map
         Map<String, ContainerAlias> aliasesByImage = Maps.newHashMap();
-        for (Entry<ContainerAlias, String> entry : NewTestSystem.IMAGES_BY_ALIAS.entrySet()) {
+        for (Entry<ContainerAlias, String> entry : NewTestEnvironment.IMAGES_BY_ALIAS.entrySet()) {
             aliasesByImage.put(entry.getValue(), entry.getKey());
         }
 

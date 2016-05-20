@@ -2,7 +2,7 @@ FROM centos:7
 MAINTAINER jesse@opennms.org
 
 # Keep this line in sync with the minion image so that they can share a common base image
-RUN yum install -y openssh-clients java-1.8.0-openjdk-devel which wget unzip ed
+RUN yum install -y openssh-clients java-1.8.0-openjdk-devel which wget unzip ed rsync
 
 # OpenNMS dependencies
 RUN rpm --import https://yum.opennms.org/OPENNMS-GPG-KEY && \
@@ -18,7 +18,9 @@ RUN yum localinstall -y /*.rpm && rm -rf /*.rpm && \
     wget -qO /opt/opennms/jetty-webapps/hawtio.war https://oss.sonatype.org/content/repositories/public/io/hawt/hawtio-default/1.4.63/hawtio-default-1.4.63.war && \
     unzip /opt/opennms/jetty-webapps/hawtio.war -d /opt/opennms/jetty-webapps/hawtio && rm -f /opt/opennms/jetty-webapps/hawtio.war
 
-COPY etc     /opt/opennms/etc
+#VOLUME /opennms-docker-overlay
+#COPY etc     /opt/opennms/etc
+COPY etc/opennms.conf /opt/opennms/etc/opennms.conf
 COPY scripts /opt/opennms/bin
  
 # Ports

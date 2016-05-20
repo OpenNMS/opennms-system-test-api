@@ -35,6 +35,8 @@ import static org.hamcrest.Matchers.notNullValue;
 
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.docker.client.DefaultDockerClient;
@@ -57,11 +60,11 @@ import com.spotify.docker.client.messages.ContainerConfig;
 import com.spotify.docker.client.messages.ContainerCreation;
 import com.spotify.docker.client.messages.ContainerInfo;
 import com.spotify.docker.client.messages.HostConfig;
-
-import jersey.repackaged.com.google.common.collect.Lists;
+import com.spotify.docker.client.messages.HostConfig.Bind;
+import com.spotify.docker.client.messages.HostConfig.Builder;
 
 /**
- * Spawns and configures a collection of Docker containers running the Minion TestSystem.
+ * Spawns and configures a collection of Docker containers running the Minion TestEnvironment.
  *
  * In particular, this is composed of:
  *  1) postgres: An instance of PostgreSQL 
@@ -72,9 +75,9 @@ import jersey.repackaged.com.google.common.collect.Lists;
  *
  * @author jwhite
  */
-public class NewTestSystem extends AbstractTestSystem implements TestSystem {
+public class NewTestEnvironment extends AbstractTestEnvironment implements TestEnvironment {
 
-    private static final Logger LOG = LoggerFactory.getLogger(NewTestSystem.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NewTestEnvironment.class);
 
     /**
      * Aliases used to refer to the containers within the tests
@@ -93,19 +96,30 @@ public class NewTestSystem extends AbstractTestSystem implements TestSystem {
      */
     public static final ImmutableMap<ContainerAlias, String> IMAGES_BY_ALIAS =
             new ImmutableMap.Builder<ContainerAlias, String>()
-                .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
-                .put(ContainerAlias.OPENNMS, "stests/opennms")
-                .put(ContainerAlias.MINION, "stests/minion")
-                .put(ContainerAlias.SNMPD, "stests/snmpd")
-                .put(ContainerAlias.TOMCAT, "stests/tomcat")
-                .build();
+            .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
+            .put(ContainerAlias.OPENNMS, "stests/opennms")
+            .put(ContainerAlias.MINION, "stests/minion")
+            .put(ContainerAlias.SNMPD, "stests/snmpd")
+            .put(ContainerAlias.TOMCAT, "stests/tomcat")
+            .build();
 
     /**
      * Set if the containers should be kept running after the tests complete
      * (regardless of whether or not they were successful)
      */
     private final boolean skipTearDown;
-    
+
+    /**
+     * A path to mount as the "opennms-docker-overlay" directory inside the
+     * OpenNMS container.
+     */
+    private Path overlayPath;
+
+    /**
+     * A collection of containers that should be started by default
+     */
+    private Collection<ContainerAlias> start;
+
     /**
      * Keeps track of the IDs for all the created containers sp we can
      * (possibly) tear them down later
@@ -122,25 +136,33 @@ public class NewTestSystem extends AbstractTestSystem implements TestSystem {
      */
     private DockerClient docker;
 
-    public NewTestSystem() {
+    public NewTestEnvironment() {
         this(false);
     }
 
-    public NewTestSystem(boolean skipTearDown) {
+    public NewTestEnvironment(boolean skipTearDown) {
+        this(skipTearDown, null, Lists.newArrayList(ContainerAlias.values()));
+    }
+
+    public NewTestEnvironment(boolean skipTearDown, final Path overlay, Collection<ContainerAlias> containers) {
         this.skipTearDown = skipTearDown;
+        this.overlayPath = overlay;
+        this.start = containers;
     }
 
     @Override
     protected void before() throws Throwable {
         docker = DefaultDockerClient.fromEnv().build();
 
-        spawnPostgres();
-        spawnOpenNMS();
-        spawnSnmpd();
-        spawnTomcat();
-        spawnMinion();
-        waitForMinion();
-        waitForOpenNMS();
+        LOG.debug("Starting containers: {}", start);
+        for (final ContainerAlias alias : start) {
+            final HostConfig config = getHostConfig(alias);
+            spawnContainer(alias, config);
+        }
+
+        for (final ContainerAlias alias : start) {
+            waitFor(alias).call();
+        }
     };
 
     @Override
@@ -194,7 +216,7 @@ public class NewTestSystem extends AbstractTestSystem implements TestSystem {
             LOG.warn("No Minion container provisioned. Logs won't be copied.");
         }
          */
-        
+
         LOG.info("************************************************************");
         LOG.info("Gathering container output...");
         LOG.info("************************************************************");
@@ -245,56 +267,62 @@ public class NewTestSystem extends AbstractTestSystem implements TestSystem {
         return containerInfoByAlias.get(alias);
     }
 
-    /**
-     * Spawns the PostgreSQL container.
-     */
-    private void spawnPostgres() throws DockerException, InterruptedException {
-        final HostConfig postgresHostConfig = HostConfig.builder()
-                .publishAllPorts(true)
-                .build();
-        spawnContainer(ContainerAlias.POSTGRES, postgresHostConfig);
+    private HostConfig getHostConfig(final ContainerAlias container) {
+        switch(container) {
+        case POSTGRES: {
+            return HostConfig.builder()
+                    .publishAllPorts(true)
+                    .build();
+        }
+        case OPENNMS: {
+            final Builder builder = HostConfig.builder()
+                    .privileged(true)
+                    .publishAllPorts(true)
+                    .links(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
+
+            if (this.overlayPath != null) {
+                builder.binds(Bind.from(overlayPath.toAbsolutePath().toString()).to("/opennms-docker-overlay").build());
+            }
+
+            return builder.build();
+        }
+        case MINION: {
+            final List<String> links = Lists.newArrayList();
+            links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
+            links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
+            links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
+
+            return HostConfig.builder()
+                    .publishAllPorts(true)
+                    .links(links)
+                    .build();
+        }
+        default: {
+            return HostConfig.builder().build();
+        }
+        }
     }
 
-    /**
-     * Spawns the OpenNMS container, linked to PostgreSQL.
-     */
-    private void spawnOpenNMS() throws DockerException, InterruptedException {
-        final HostConfig opennmsHostConfig = HostConfig.builder()
-                .privileged(true)
-                .publishAllPorts(true)
-                .links(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()))
-                .build();
-        spawnContainer(ContainerAlias.OPENNMS, opennmsHostConfig);
-    }
-
-    /**
-     * Spawns the Net-SNMP container.
-     */
-    private void spawnSnmpd() throws DockerException, InterruptedException {
-        spawnContainer(ContainerAlias.SNMPD, HostConfig.builder().build());
-    }
-
-    /**
-     * Spawns the Tomcat container.
-     */
-    private void spawnTomcat() throws DockerException, InterruptedException {
-        spawnContainer(ContainerAlias.TOMCAT, HostConfig.builder().build());
-    }
-
-    /**
-     * Spawns the Minion container, linked to OpenNMS, Net-SNMP and Tomcat.
-     */
-    private void spawnMinion() throws DockerException, InterruptedException {
-        final List<String> links = Lists.newArrayList();
-        links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
-        links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
-        links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
-
-        final HostConfig minionHostConfig = HostConfig.builder()
-                .publishAllPorts(true)
-                .links(links)
-                .build();
-        spawnContainer(ContainerAlias.MINION, minionHostConfig);
+    private Callable<Void> waitFor(final ContainerAlias alias) {
+        return new Callable<Void>() {
+            @Override public Void call() throws Exception {
+                LOG.debug("waitFor({})", alias);
+                switch(alias) {
+                    case OPENNMS: {
+                        waitForOpenNMS();
+                        break;
+                    }
+                    case MINION: {
+                        waitForMinion();
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+                return null;
+            }
+        };
     }
 
     /**
@@ -377,8 +405,8 @@ public class NewTestSystem extends AbstractTestSystem implements TestSystem {
 
     private static void listFeatures(InetSocketAddress sshAddr, boolean karaf4) throws Exception {
         try (
-            final SshClient sshClient = new SshClient(sshAddr, "admin", "admin");
-        ) {
+                final SshClient sshClient = new SshClient(sshAddr, "admin", "admin");
+                ) {
             PrintStream pipe = sshClient.openShell();
             if (karaf4) {
                 pipe.println("feature:list -i");

@@ -28,6 +28,10 @@ EOF
 #wq
 #EOF
 
+echo "Overlaying files from /opt/opennms-docker-overlay/ onto ${OPENNMS_HOME}"
+find /opt/opennms-docker-overlay -ls
+rsync -ar /opt/opennms-docker-overlay/ "${OPENNMS_HOME}"/
+
 echo "Waiting for Postgres to start..."
 WAIT=0
 while ! $(timeout 1 bash -c 'cat < /dev/null > /dev/tcp/$POSTGRES_PORT_5432_TCP_ADDR/$POSTGRES_PORT_5432_TCP_PORT'); do
