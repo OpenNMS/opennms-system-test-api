@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -77,7 +78,7 @@ public class TestEnvironmentBuilder {
     protected File createFile(final String path) {
         if (m_overlayDir == null) {
             try {
-                m_overlayDir = Files.createTempDirectory("opennms-overlay");
+                m_overlayDir = Files.createTempDirectory(Paths.get("target").toAbsolutePath(), "opennms-overlay");
             } catch (IOException e) {
                 throw new RuntimeException("Unable to create OpenNMS overlay temporary directory!", e);
             }
