@@ -4,6 +4,9 @@
 echo "Pulling postgres image from public registry"
 docker pull postgres:9.5.1
 
+echo "Building base image"
+docker build -t stests/base ./base
+
 echo "Building Minion image"
 docker build -t stests/minion ./minion
 

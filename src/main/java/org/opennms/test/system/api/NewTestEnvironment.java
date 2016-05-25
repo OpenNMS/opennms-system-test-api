@@ -33,9 +33,14 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
-import java.nio.file.Path;
+import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +65,6 @@ import com.spotify.docker.client.messages.ContainerConfig;
 import com.spotify.docker.client.messages.ContainerCreation;
 import com.spotify.docker.client.messages.ContainerInfo;
 import com.spotify.docker.client.messages.HostConfig;
-import com.spotify.docker.client.messages.HostConfig.Bind;
 import com.spotify.docker.client.messages.HostConfig.Builder;
 
 /**
@@ -110,10 +114,10 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private final boolean skipTearDown;
 
     /**
-     * A path to mount as the "opennms-docker-overlay" directory inside the
-     * OpenNMS container.
+     * A map of paths to bind inside the container(s).
+     * The binds should be in the docker "<source>:<destination>" format.
      */
-    private Path overlayPath;
+    private Map<ContainerAlias, List<String>> binds;
 
     /**
      * A collection of containers that should be started by default
@@ -121,7 +125,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private Collection<ContainerAlias> start;
 
     /**
-     * Keeps track of the IDs for all the created containers sp we can
+     * Keeps track of the IDs for all the created containers so we can
      * (possibly) tear them down later
      */
     private final Set<String> createdContainerIds = Sets.newHashSet();
@@ -144,9 +148,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         this(skipTearDown, null, Lists.newArrayList(ContainerAlias.values()));
     }
 
-    public NewTestEnvironment(boolean skipTearDown, final Path overlay, Collection<ContainerAlias> containers) {
+    public NewTestEnvironment(boolean skipTearDown, final Map<ContainerAlias, List<String>> binds, Collection<ContainerAlias> containers) {
         this.skipTearDown = skipTearDown;
-        this.overlayPath = overlay;
+        this.binds = binds;
         this.start = containers;
     }
 
@@ -155,14 +159,20 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         docker = DefaultDockerClient.fromEnv().build();
 
         LOG.debug("Starting containers: {}", start);
-        for (final ContainerAlias alias : start) {
-            final HostConfig config = getHostConfig(alias);
-            spawnContainer(alias, config);
-        }
 
-        for (final ContainerAlias alias : start) {
-            waitFor(alias).call();
-        }
+        spawnPostgres();
+        spawnOpenNMS();
+        spawnSnmpd();
+        spawnTomcat();
+        spawnMinion();
+
+        LOG.debug("Waiting for containers to be ready: {}", start);
+
+        waitForPostgres();
+        waitForOpenNMS();
+        waitForSnmpd();
+        waitForTomcat();
+        waitForMinion();
     };
 
     @Override
@@ -250,6 +260,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                     LOG.error("************************************************************");
                 }
             }
+            containerInfoByAlias.clear();
+            createdContainerIds.clear();
         } else {
             LOG.info("Skipping tear down.");
         }
@@ -267,71 +279,103 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         return containerInfoByAlias.get(alias);
     }
 
-    private HostConfig getHostConfig(final ContainerAlias container) {
-        switch(container) {
-        case POSTGRES: {
-            return HostConfig.builder()
-                    .publishAllPorts(true)
-                    .build();
+    /**
+     * Spawns the PostgreSQL container.
+     */
+    private void spawnPostgres() throws DockerException, InterruptedException, IOException {
+        final ContainerAlias alias = ContainerAlias.POSTGRES;
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
         }
-        case OPENNMS: {
-            final Builder builder = HostConfig.builder()
-                    .privileged(true)
-                    .publishAllPorts(true)
-                    .links(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
 
-            if (this.overlayPath != null) {
-                builder.binds(Bind.from(overlayPath.toAbsolutePath().toString()).to("/opennms-docker-overlay").build());
-            }
-
-            return builder.build();
-        }
-        case MINION: {
-            final List<String> links = Lists.newArrayList();
-            links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
-            links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
-            links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
-
-            return HostConfig.builder()
-                    .publishAllPorts(true)
-                    .links(links)
-                    .build();
-        }
-        default: {
-            return HostConfig.builder().build();
-        }
-        }
-    }
-
-    private Callable<Void> waitFor(final ContainerAlias alias) {
-        return new Callable<Void>() {
-            @Override public Void call() throws Exception {
-                LOG.debug("waitFor({})", alias);
-                switch(alias) {
-                    case OPENNMS: {
-                        waitForOpenNMS();
-                        break;
-                    }
-                    case MINION: {
-                        waitForMinion();
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
-                return null;
-            }
-        };
+        final Builder builder = HostConfig.builder()
+                .publishAllPorts(true);
+        spawnContainer(alias, builder);
     }
 
     /**
+     * Spawns the OpenNMS container, linked to PostgreSQL.
+     */
+    private void spawnOpenNMS() throws DockerException, InterruptedException, IOException {
+        final ContainerAlias alias = ContainerAlias.OPENNMS;
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
+        }
+
+        final Builder builder = HostConfig.builder()
+                .privileged(true)
+                .publishAllPorts(true)
+                .links(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
+        spawnContainer(alias, builder);
+    }
+
+    /**
+     * Spawns the Net-SNMP container.
+     */
+    private void spawnSnmpd() throws DockerException, InterruptedException, IOException {
+        final ContainerAlias alias = ContainerAlias.SNMPD;
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
+        }
+
+        spawnContainer(alias, HostConfig.builder());
+    }
+
+    /**
+     * Spawns the Tomcat container.
+     */
+    private void spawnTomcat() throws DockerException, InterruptedException, IOException {
+        final ContainerAlias alias = ContainerAlias.TOMCAT;
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
+        }
+
+        spawnContainer(alias, HostConfig.builder());
+    }
+
+    /**
+     * Spawns the Minion container, linked to OpenNMS, Net-SNMP and Tomcat.
+     */
+    private void spawnMinion() throws DockerException, InterruptedException, IOException {
+        final ContainerAlias alias = ContainerAlias.MINION;
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
+        }
+
+        final List<String> links = Lists.newArrayList();
+        links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
+        links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
+        links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
+
+        final Builder builder = HostConfig.builder()
+                .publishAllPorts(true)
+                .links(links);
+        spawnContainer(alias, builder);
+    }
+
+    private boolean isEnabled(final ContainerAlias alias) {
+        return start.contains(alias);
+    }
+
+    private boolean isSpawned(final ContainerAlias alias) {
+        return !containerInfoByAlias.containsKey(alias);
+    }
+    /**
      * Spawns a container.
      */
-    private void spawnContainer(ContainerAlias alias, HostConfig hostConfig) throws DockerException, InterruptedException {
+    private void spawnContainer(final ContainerAlias alias, final Builder hostConfigBuilder) throws DockerException, InterruptedException, IOException {
+        if (this.binds.containsKey(alias)) {
+            final List<String> containerBinds = this.binds.get(alias);
+            for (final String bind : containerBinds) {
+                final String sourceDirectory = bind.split(":")[0];
+                Files.createDirectories(Paths.get(sourceDirectory));
+            }
+            hostConfigBuilder.binds(containerBinds);
+        }
+
         final ContainerConfig containerConfig = ContainerConfig.builder()
                 .image(IMAGES_BY_ALIAS.get(alias))
-                .hostConfig(hostConfig)
+                .hostConfig(hostConfigBuilder.build())
                 .build();
 
         final ContainerCreation containerCreation = docker.createContainer(containerConfig);
@@ -352,10 +396,51 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     }
 
     /**
+     * Blocks until we can connect to the PostgreSQL data port.
+     */
+    private void waitForPostgres() {
+        final ContainerAlias alias = ContainerAlias.POSTGRES;
+        if (!isEnabled(alias)) {
+            return;
+        }
+
+        final InetSocketAddress postgresAddr = getServiceAddress(alias, 5432);
+        final Callable<Boolean> isConnected = new Callable<Boolean>() {
+            @Override
+            public Boolean call() throws Exception {
+                try {
+                    final Socket socket = new Socket(postgresAddr.getAddress(), postgresAddr.getPort());
+                    socket.setReuseAddress(true);
+                    final InputStream is = socket.getInputStream();
+                    final OutputStream os = socket.getOutputStream();
+                    os.write("¯\\_(ツ)_/¯\n".getBytes());
+                    os.close();
+                    is.close();
+                    socket.close();
+                    // good enough, not gonna try speaking the PostgreSQL protocol
+                    return true;
+                } catch (final Throwable t) {
+                    LOG.debug("PostgreSQL connect failed: " + t.getMessage());
+                    return null;
+                }
+            }
+        };
+        LOG.info("************************************************************");
+        LOG.info("Waiting for PostgreSQL service @ {}.", postgresAddr);
+        LOG.info("************************************************************");
+        await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(isConnected, is(notNullValue()));
+    }
+
+    /**
      * Blocks until the REST and Karaf Shell services are available.
      */
     private void waitForOpenNMS() throws Exception {
-        final InetSocketAddress httpAddr = getServiceAddress(ContainerAlias.OPENNMS, 8980);
+        final ContainerAlias alias = ContainerAlias.OPENNMS;
+        if (!isEnabled(alias)) {
+            return;
+        }
+
+        final InetSocketAddress httpAddr = getServiceAddress(alias, 8980);
         final RestClient restClient = new RestClient(httpAddr);
         final Callable<String> getDisplayVersion = new Callable<String>() {
             @Override
@@ -375,12 +460,12 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         // TODO: It's possible that the OpenNMS server doesn't start if there are any
         // problems in $OPENNMS_HOME/etc. Instead of waiting the whole 5 minutes and timing out
         // we should also poll the status of the container, so we can fail sooner.
-        await().atMost(5, MINUTES).pollInterval(15, SECONDS).until(getDisplayVersion, is(notNullValue()));
+        await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(getDisplayVersion, is(notNullValue()));
         LOG.info("************************************************************");
         LOG.info("OpenNMS's REST service is online.");
         LOG.info("************************************************************");
 
-        final InetSocketAddress sshAddr = getServiceAddress(ContainerAlias.OPENNMS, 8101);
+        final InetSocketAddress sshAddr = getServiceAddress(alias, 8101);
         LOG.info("************************************************************");
         LOG.info("Waiting for SSH service @ {}.", sshAddr);
         LOG.info("************************************************************");
@@ -392,10 +477,37 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     }
 
     /**
+     * TODO: Blocks until the SNMP daemon is available.
+     */
+    private void waitForSnmpd() throws Exception {
+        final ContainerAlias alias = ContainerAlias.SNMPD;
+        if (!isEnabled(alias)) {
+            return;
+        }
+
+    }
+
+    /**
+     * TODO: Blocks until the Tomcat HTTP daemon is available.
+     */
+    private void waitForTomcat() throws Exception {
+        final ContainerAlias alias = ContainerAlias.TOMCAT;
+        if (!isEnabled(alias)) {
+            return;
+        }
+
+    }
+
+    /**
      * Blocks until the Karaf Shell service is available.
      */
     private void waitForMinion() throws Exception {
-        final InetSocketAddress sshAddr = getServiceAddress(ContainerAlias.MINION, 8201);
+        final ContainerAlias alias = ContainerAlias.MINION;
+        if (!isEnabled(alias)) {
+            return;
+        }
+
+        final InetSocketAddress sshAddr = getServiceAddress(alias, 8201);
         LOG.info("************************************************************");
         LOG.info("Waiting for SSH service for Karaf instance @ {}.", sshAddr);
         LOG.info("************************************************************");

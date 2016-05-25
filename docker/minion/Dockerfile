@@ -1,11 +1,11 @@
-FROM centos:7
+FROM stests/base
 MAINTAINER jesse@opennms.org
 
-# Keep this line in sync with the opennms image so that they can share a common base image
-RUN yum install -y openssh-clients java-1.8.0-openjdk-devel which wget unzip ed
-
 ADD /rpms/*.rpm /
-RUN yum localinstall -y /*.rpm && rm -rf /*.rpm
+# Does minion really need postgresql-server?
+RUN yum install -y /*.rpm && \
+	rm -rf /*.rpm && \
+	yum -y clean all
 
 COPY etc     /opt/minion/etc
 COPY scripts /opt/minion/bin
