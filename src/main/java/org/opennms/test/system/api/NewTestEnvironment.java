@@ -40,13 +40,16 @@ import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
+import org.apache.cxf.helpers.FileUtils;
 import org.opennms.test.system.api.utils.RestClient;
 import org.opennms.test.system.api.utils.SshClient;
 import org.slf4j.Logger;
@@ -108,16 +111,20 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             .build();
 
     /**
+     * The name of this test environment.
+     */
+    private final String name;
+
+    /**
      * Set if the containers should be kept running after the tests complete
      * (regardless of whether or not they were successful)
      */
     private final boolean skipTearDown;
 
     /**
-     * A map of paths to bind inside the container(s).
-     * The binds should be in the docker "<source>:<destination>" format.
+     * The location of the files to be overlayed into /opt/opennms.
      */
-    private Map<ContainerAlias, List<String>> binds;
+    private Path overlayDirectory;
 
     /**
      * A collection of containers that should be started by default
@@ -140,17 +147,10 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     private DockerClient docker;
 
-    public NewTestEnvironment() {
-        this(false);
-    }
-
-    public NewTestEnvironment(boolean skipTearDown) {
-        this(skipTearDown, null, Lists.newArrayList(ContainerAlias.values()));
-    }
-
-    public NewTestEnvironment(boolean skipTearDown, final Map<ContainerAlias, List<String>> binds, Collection<ContainerAlias> containers) {
+    public NewTestEnvironment(final String name, final boolean skipTearDown, final Path overlayDirectory, final Collection<ContainerAlias> containers) {
+        this.name = name;
         this.skipTearDown = skipTearDown;
-        this.binds = binds;
+        this.overlayDirectory = overlayDirectory;
         this.start = containers;
     }
 
@@ -302,10 +302,44 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
+        final Path overlayRoot = Paths.get("target", "overlays", this.description.getTestClass().getSimpleName()).toAbsolutePath();
+        if (overlayRoot.toFile().exists()) {
+            FileUtils.removeDir(overlayRoot.toFile());
+        }
+
+        final Path opennmsOverlay = overlayRoot.resolve("opennms-overlay");
+        final Path opennmsLogs = overlayRoot.resolve("opennms-logs");
+        final Path opennmsKarafLogs = overlayRoot.resolve("opennms-karaf-logs");
+
+        Files.createDirectories(opennmsOverlay);
+        Files.createDirectories(opennmsLogs);
+        Files.createDirectories(opennmsKarafLogs);
+
+        Files.find(this.overlayDirectory, 10, (path, attr) -> {
+            return path.toFile().isFile();
+        }).forEach(path -> {
+            final Path relative = Paths.get(this.overlayDirectory.toFile().toURI().relativize(path.toFile().toURI()).getPath());
+            final Path to = Paths.get(opennmsOverlay.toString(), relative.toString());
+            LOG.debug("Copying {} to {}", path.toAbsolutePath(), to.toAbsolutePath());
+            try {
+                Files.createDirectories(to.getParent());
+                Files.copy(path.toAbsolutePath(), to.toAbsolutePath());
+            } catch (final Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        final List<String> binds = new ArrayList<>();
+        binds.add(opennmsOverlay.toString() + ":/opennms-docker-overlay");
+        binds.add(opennmsLogs.toString() + ":/var/log/opennms");
+        binds.add(opennmsKarafLogs.toString() + ":/opt/opennms/data/log");
+
         final Builder builder = HostConfig.builder()
                 .privileged(true)
                 .publishAllPorts(true)
-                .links(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
+                .links(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()))
+                .binds(binds);
+
         spawnContainer(alias, builder);
     }
 
@@ -360,22 +394,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private boolean isSpawned(final ContainerAlias alias) {
         return !containerInfoByAlias.containsKey(alias);
     }
+
     /**
      * Spawns a container.
      */
     private void spawnContainer(final ContainerAlias alias, final Builder hostConfigBuilder) throws DockerException, InterruptedException, IOException {
-        if (this.binds.containsKey(alias)) {
-            final List<String> containerBinds = this.binds.get(alias);
-            for (final String bind : containerBinds) {
-                final String sourceDirectory = bind.split(":")[0];
-                Files.createDirectories(Paths.get(sourceDirectory));
-            }
-            hostConfigBuilder.binds(containerBinds);
-        }
-
         final ContainerConfig containerConfig = ContainerConfig.builder()
                 .image(IMAGES_BY_ALIAS.get(alias))
                 .hostConfig(hostConfigBuilder.build())
+                .hostname(this.name + ".local")
                 .build();
 
         final ContainerCreation containerCreation = docker.createContainer(containerConfig);
@@ -446,7 +473,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             @Override
             public String call() throws Exception {
                 try {
-                    return restClient.getDisplayVersion();
+                    final String displayVersion = restClient.getDisplayVersion();
+                    LOG.info("Connected to OpenNMS version {}", displayVersion);
+                    return displayVersion;
                 } catch (Throwable t) {
                     LOG.debug("Version lookup failed: " + t.getMessage());
                     return null;

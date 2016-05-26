@@ -40,7 +40,10 @@ import org.junit.runners.model.Statement;
  * @author jwhite
  */
 public abstract class ExternalResourceRule implements TestRule {
+    protected Description description;
+
     public Statement apply(Statement base, Description description) {
+        this.description = description;
         return statement(base);
     }
 

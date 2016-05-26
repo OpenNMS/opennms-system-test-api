@@ -9,25 +9,24 @@ import java.io.OutputStream;
 import java.io.Writer;
 import java.net.URL;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.UUID;
 
-import org.apache.cxf.helpers.FileUtils;
 import org.apache.cxf.helpers.IOUtils;
 import org.opennms.test.system.api.NewTestEnvironment.ContainerAlias;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.io.Files;
+
 public class TestEnvironmentBuilder {
     private static Logger LOG = LoggerFactory.getLogger(TestEnvironmentBuilder.class);
 
-    private static AtomicInteger m_containerNumber = new AtomicInteger(1);
+    private String m_name = null;
     private boolean m_skipTearDown = false;
     private boolean m_useExisting = false;
     private Map<ContainerAlias,List<String>> m_binds = new HashMap<>();
@@ -73,21 +72,6 @@ public class TestEnvironmentBuilder {
         postgres();
         m_containers.add(ContainerAlias.OPENNMS);
 
-        final Path overlayRoot = Paths.get("target", "overlays", Integer.toString(m_containerNumber.get())).toAbsolutePath();
-        if (overlayRoot.toFile().exists()) {
-            FileUtils.removeDir(overlayRoot.toFile());
-        }
-
-        m_opennmsOverlay = overlayRoot.resolve("opennms-overlay");
-        final Path opennmsLogs = overlayRoot.resolve("opennms-logs");
-        final Path opennmsKarafLogs = overlayRoot.resolve("opennms-karaf-logs");
-
-        final List<String> binds = new ArrayList<>();
-        binds.add(m_opennmsOverlay.toString() + ":/opennms-docker-overlay");
-        binds.add(opennmsLogs.toString() + ":/var/log/opennms");
-        binds.add(opennmsKarafLogs.toString() + ":/opt/opennms/data/log");
-
-        m_binds.put(ContainerAlias.OPENNMS, binds);
         return this;
     }
 
@@ -109,6 +93,11 @@ public class TestEnvironmentBuilder {
 
     public TestEnvironmentBuilder tomcat() {
         m_containers.add(ContainerAlias.TOMCAT);
+        return this;
+    }
+
+    public TestEnvironmentBuilder name(final String name) {
+        m_name = name;
         return this;
     }
 
@@ -145,6 +134,10 @@ public class TestEnvironmentBuilder {
     }
 
     protected File createFile(final String path) {
+        if (m_opennmsOverlay == null) {
+            m_opennmsOverlay = Files.createTempDir().toPath();
+        }
+
         final Path filePath = m_opennmsOverlay.resolve(path);
         filePath.getParent().toFile().mkdirs();
         final File file = filePath.toFile();
@@ -156,13 +149,19 @@ public class TestEnvironmentBuilder {
             all();
         }
 
-        m_containerNumber.incrementAndGet();
-
         LOG.debug("Creating environment with containers: {}", m_containers);
         if (m_useExisting) {
             return new ExistingTestEnvironment();
         } else {
-            return new NewTestEnvironment(m_skipTearDown, m_binds, m_containers);
+            return new NewTestEnvironment(m_name, m_skipTearDown, m_opennmsOverlay, m_containers);
         }
+    }
+
+    private String generateRandomName() {
+        String id;
+        do {
+            id = UUID.randomUUID().toString();
+        } while (!id.matches("^[a-zA-Z]"));
+        return id;
     }
 }
