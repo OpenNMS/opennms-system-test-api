@@ -1,22 +1,24 @@
 FROM stests/base
 MAINTAINER jesse@opennms.org
 
-# OpenNMS & Hawtio
-ADD /rpms/*.rpm /
-RUN yum install -y /*.rpm \
+# Install OpenNMS dependencies
+RUN yum install -y \
 	jicmp \
 	jicmp6 \
 	jrrd \
 	jrrd2 \
 	postgresql \
 	R && \
+	yum -y clean all
+
+# Install OpenNMS & Hawtio
+ADD /rpms/*.rpm /
+RUN yum install -y /*.rpm && \
 	rm -rf /*.rpm && \
 	yum -y clean all && \
 	wget -qO /opt/opennms/jetty-webapps/hawtio.war https://oss.sonatype.org/content/repositories/public/io/hawt/hawtio-default/1.4.63/hawtio-default-1.4.63.war && \
 	unzip /opt/opennms/jetty-webapps/hawtio.war -d /opt/opennms/jetty-webapps/hawtio && rm -f /opt/opennms/jetty-webapps/hawtio.war
 
-#VOLUME /opennms-docker-overlay
-#COPY etc     /opt/opennms/etc
 COPY etc/opennms.conf /opt/opennms/etc/opennms.conf
 COPY scripts /opt/opennms/bin
  
