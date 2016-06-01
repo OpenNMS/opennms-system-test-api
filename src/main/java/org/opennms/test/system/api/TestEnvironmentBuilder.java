@@ -9,12 +9,8 @@ import java.io.OutputStream;
 import java.io.Writer;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 import org.apache.cxf.helpers.IOUtils;
 import org.opennms.test.system.api.NewTestEnvironment.ContainerAlias;
@@ -29,7 +25,6 @@ public class TestEnvironmentBuilder {
     private String m_name = null;
     private boolean m_skipTearDown = false;
     private boolean m_useExisting = false;
-    private Map<ContainerAlias,List<String>> m_binds = new HashMap<>();
     private Set<ContainerAlias> m_containers = new LinkedHashSet<>();
 
     private Path m_opennmsOverlay;
@@ -47,7 +42,7 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
-    public TestEnvironmentBuilder all() throws IOException {
+    public TestEnvironmentBuilder all() {
         opennms();
         minion();
         snmpd();
@@ -65,7 +60,7 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
-    public TestEnvironmentBuilder opennms() throws IOException {
+    public TestEnvironmentBuilder opennms() {
         if (m_containers.contains(ContainerAlias.OPENNMS)) {
             return this;
         }
@@ -144,7 +139,7 @@ public class TestEnvironmentBuilder {
         return file;
     }
 
-    public TestEnvironment build() throws IOException {
+    public TestEnvironment build() {
         if (m_containers.size() == 0) {
             all();
         }
@@ -155,13 +150,5 @@ public class TestEnvironmentBuilder {
         } else {
             return new NewTestEnvironment(m_name, m_skipTearDown, m_opennmsOverlay, m_containers);
         }
-    }
-
-    private String generateRandomName() {
-        String id;
-        do {
-            id = UUID.randomUUID().toString();
-        } while (!id.matches("^[a-zA-Z]"));
-        return id;
     }
 }
