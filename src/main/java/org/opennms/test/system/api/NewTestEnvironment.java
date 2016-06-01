@@ -315,19 +315,21 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         Files.createDirectories(opennmsLogs);
         Files.createDirectories(opennmsKarafLogs);
 
-        Files.find(this.overlayDirectory, 10, (path, attr) -> {
-            return path.toFile().isFile();
-        }).forEach(path -> {
-            final Path relative = Paths.get(this.overlayDirectory.toFile().toURI().relativize(path.toFile().toURI()).getPath());
-            final Path to = Paths.get(opennmsOverlay.toString(), relative.toString());
-            LOG.debug("Copying {} to {}", path.toAbsolutePath(), to.toAbsolutePath());
-            try {
-                Files.createDirectories(to.getParent());
-                Files.copy(path.toAbsolutePath(), to.toAbsolutePath());
-            } catch (final Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
+        if (this.overlayDirectory != null) {
+            Files.find(this.overlayDirectory, 10, (path, attr) -> {
+                return path.toFile().isFile();
+            }).forEach(path -> {
+                final Path relative = Paths.get(this.overlayDirectory.toFile().toURI().relativize(path.toFile().toURI()).getPath());
+                final Path to = Paths.get(opennmsOverlay.toString(), relative.toString());
+                LOG.debug("Copying {} to {}", path.toAbsolutePath(), to.toAbsolutePath());
+                try {
+                    Files.createDirectories(to.getParent());
+                    Files.copy(path.toAbsolutePath(), to.toAbsolutePath());
+                } catch (final Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
 
         final List<String> binds = new ArrayList<>();
         binds.add(opennmsOverlay.toString() + ":/opennms-docker-overlay");
