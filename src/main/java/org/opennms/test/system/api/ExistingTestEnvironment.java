@@ -29,10 +29,9 @@ package org.opennms.test.system.api;
 
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.opennms.test.system.api.NewTestEnvironment.ContainerAlias;
-
-import java.util.Set;
 
 import com.google.common.collect.Maps;
 import com.spotify.docker.client.DefaultDockerClient;
@@ -77,7 +76,7 @@ public class ExistingTestEnvironment extends AbstractTestEnvironment implements 
     }
 
     @Override
-    protected void after(boolean didFail) {
+    protected void after(final boolean didFail, final Throwable failure) {
         if (docker == null) {
             return;
         }

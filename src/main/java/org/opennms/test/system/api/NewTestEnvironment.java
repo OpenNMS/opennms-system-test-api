@@ -176,12 +176,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     };
 
     @Override
-    protected void after(boolean didFail) {
+    protected void after(final boolean didFail, final Throwable failure) {
         if (docker == null) {
             LOG.warn("Docker instance is null. Skipping tear down.");
             return;
         }
 
+        if (didFail) {
+            LOG.error("Test failed!", failure);
+        }
         /* TODO: Gathering the log files can cause the tests to hang indefinitely.
         // Ideally, we would only gather the logs and container output
         // when we fail, but we can't detect this when using @ClassRules
@@ -211,14 +214,11 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         // Ideally, we would only gather the logs and container output
         // when we fail, but we can't detect this when using @ClassRules
-        opennmsContainerInfo = containerInfoByAlias.get(ContainerAlias.MINION);
-        if (opennmsContainerInfo != null) {
-            LOG.info("Gathering Minion logs...");
-            final Path destination = Paths.get("target/minion.logs.tar");
-            try (
-                 final InputStream in = docker.copyContainer(opennmsContainerInfo.id(), "/opt/minion/data/log");
-                 ) {
-                Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
+        final ContainerInfo minionContainerInfo = getContainerInfo(ContainerAlias.MINION);
+        if (minionContainerInfo != null && start.contains(ContainerAlias.MINION)) {
+            try (final InputStream in = docker.copyContainer(minionContainerInfo.id(), "/opt/minion/data/log")) {
+                final Path destination = Paths.get("target", name + "-minion.logs.tar");
+                Files.copy(in,  destination, StandardCopyOption.REPLACE_EXISTING);
             } catch (DockerException|InterruptedException|IOException e) {
                 LOG.warn("Failed to copy the logs directory from the Minion container.", e);
             }

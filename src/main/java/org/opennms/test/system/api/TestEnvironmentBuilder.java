@@ -25,6 +25,8 @@ public class TestEnvironmentBuilder {
     private String m_name = null;
     private boolean m_skipTearDown = false;
     private boolean m_useExisting = false;
+    private boolean m_optIn = false; // opt-out by default; user can specify explicitly by calling .optIn(boolean)
+
     private Set<ContainerAlias> m_containers = new LinkedHashSet<>();
 
     private Path m_opennmsOverlay;
@@ -97,14 +99,7 @@ public class TestEnvironmentBuilder {
     }
 
     public TestEnvironmentBuilder optIn(final boolean optIn) {
-        final File datachoices = createFile("etc/org.opennms.features.datachoices.cfg");
-        try (final Writer w = new FileWriter(datachoices)) {
-            w.write("enabled=" + optIn + "\n" +
-                    "acknowledged-by=admin\n" +
-                    "acknowledged-at=Thu Mar 24 10\\:41\\:25 EDT 2016\n");
-        } catch (final IOException e) {
-            throw new RuntimeException("Failed to create opt-in="+optIn+" file in $OPENNMS_HOME/etc!", e);
-        }
+        m_optIn = optIn;
         return this;
     }
 
@@ -142,6 +137,15 @@ public class TestEnvironmentBuilder {
     public TestEnvironment build() {
         if (m_containers.size() == 0) {
             all();
+        }
+
+        final File datachoices = createFile("etc/org.opennms.features.datachoices.cfg");
+        try (final Writer w = new FileWriter(datachoices)) {
+            w.write("enabled=" + m_optIn + "\n" +
+                    "acknowledged-by=admin\n" +
+                    "acknowledged-at=Thu Mar 24 10\\:41\\:25 EDT 2016\n");
+        } catch (final IOException e) {
+            throw new RuntimeException("Failed to create opt-in enabled="+m_optIn+" file in $OPENNMS_HOME/etc!", e);
         }
 
         LOG.debug("Creating environment with containers: {}", m_containers);

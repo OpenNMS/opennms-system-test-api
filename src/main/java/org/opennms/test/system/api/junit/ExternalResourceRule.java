@@ -52,14 +52,16 @@ public abstract class ExternalResourceRule implements TestRule {
             @Override
             public void evaluate() throws Throwable {
                 boolean didFail = true;
+                Throwable failure = null;
                 try {
                     before();
                     base.evaluate();
                     didFail = false;
                 } catch (Throwable t) {
+                    failure = t;
                     throw t;
                 } finally {
-                    after(didFail);
+                    after(didFail, failure);
                 }
             }
         };
@@ -77,7 +79,7 @@ public abstract class ExternalResourceRule implements TestRule {
     /**
      * Override to tear down your specific external resource.
      */
-    protected void after(boolean didFail) {
+    protected void after(boolean failed, Throwable t) {
         // do nothing
     }
 }
