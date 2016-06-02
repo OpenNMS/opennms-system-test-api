@@ -2,7 +2,6 @@ FROM stests/base
 MAINTAINER jesse@opennms.org
 
 ADD /rpms/*.rpm /
-# Does minion really need postgresql-server?
 RUN yum install -y /*.rpm && \
 	rm -rf /*.rpm && \
 	yum -y clean all
