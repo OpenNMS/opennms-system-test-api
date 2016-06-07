@@ -155,7 +155,9 @@ public class TestEnvironmentBuilder {
     }
 
     public OpenNMSEnvironmentBuilder withOpenNMSEnvironment() {
-        m_opennmsEnvironmentBuilder = new OpenNMSEnvironmentBuilder();
+        if (m_opennmsEnvironmentBuilder == null) {
+            m_opennmsEnvironmentBuilder = new OpenNMSEnvironmentBuilder();
+        }
         return m_opennmsEnvironmentBuilder;
     }
 
