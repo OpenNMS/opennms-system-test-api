@@ -33,6 +33,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -148,10 +149,14 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private DockerClient docker;
 
     public NewTestEnvironment(final String name, final boolean skipTearDown, final Path overlayDirectory, final Collection<ContainerAlias> containers) {
-        this.name = name;
         this.skipTearDown = skipTearDown;
         this.overlayDirectory = overlayDirectory;
         this.start = containers;
+        this.name = name;
+    }
+
+    public String getName() {
+        return this.name == null? this.description.getTestClass().getSimpleName() : this.name;
     }
 
     @Override
@@ -217,7 +222,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         final ContainerInfo minionContainerInfo = getContainerInfo(ContainerAlias.MINION);
         if (minionContainerInfo != null && start.contains(ContainerAlias.MINION)) {
             try (final InputStream in = docker.copyContainer(minionContainerInfo.id(), "/opt/minion/data/log")) {
-                final Path destination = Paths.get("target", name + "-minion.logs.tar");
+                final Path destination = Paths.get("target", getName() + "-minion.logs.tar");
                 Files.copy(in,  destination, StandardCopyOption.REPLACE_EXISTING);
             } catch (DockerException|InterruptedException|IOException e) {
                 LOG.warn("Failed to copy the logs directory from the Minion container.", e);
@@ -230,17 +235,28 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         LOG.info("************************************************************");
         LOG.info("Gathering container output...");
         LOG.info("************************************************************");
-        for (String containerId : createdContainerIds) {
+        for (final String containerId : createdContainerIds) {
             try {
                 LogStream logStream = docker.logs(containerId, LogsParam.stdout(), LogsParam.stderr());
+                /*
                 LOG.info("************************************************************");
                 LOG.info("Start of stdout/stderr for {}:", containerId);
                 LOG.info("************************************************************");
+                */
+                final Path outputPath = Paths.get("target", getName() + "-" + containerId + "-output.log");
+                LOG.info("* writing stdout/stderr for {} to {}", containerId, outputPath);
+                try (final FileWriter fw = new FileWriter(outputPath.toFile())) {
+                    fw.write(logStream.readFully());
+                } catch (final IOException e) {
+                    LOG.warn("Unable to write to {}", outputPath, e);
+                }
+                /*
                 LOG.info(logStream.readFully());
                 LOG.info("************************************************************");
                 LOG.info("End of stdout/stderr for {}:", containerId);
                 LOG.info("************************************************************");
-            } catch (DockerException | InterruptedException e) {
+                */
+            } catch (final DockerException | InterruptedException e) {
                 LOG.warn("Failed to get stdout/stderr for container {}.", e);
             }
         }
@@ -302,7 +318,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
-        final Path overlayRoot = Paths.get("target", "overlays", this.description.getTestClass().getSimpleName()).toAbsolutePath();
+        final Path overlayRoot = Paths.get("target", "overlays", getName()).toAbsolutePath();
         if (overlayRoot.toFile().exists()) {
             FileUtils.removeDir(overlayRoot.toFile());
         }
@@ -404,7 +420,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         final ContainerConfig containerConfig = ContainerConfig.builder()
                 .image(IMAGES_BY_ALIAS.get(alias))
                 .hostConfig(hostConfigBuilder.build())
-                .hostname(this.name + ".local")
+                .hostname(getName() + ".local")
                 .build();
 
         final ContainerCreation containerCreation = docker.createContainer(containerConfig);

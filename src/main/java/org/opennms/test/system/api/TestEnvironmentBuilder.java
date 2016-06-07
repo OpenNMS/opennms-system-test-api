@@ -20,16 +20,72 @@ import org.slf4j.LoggerFactory;
 import com.google.common.io.Files;
 
 public class TestEnvironmentBuilder {
+    public static class OpenNMSEnvironmentBuilder {
+        private boolean m_optIn = false; // opt-out by default; user can specify explicitly by calling .optIn(boolean)
+        private Path m_opennmsOverlay;
+
+        public OpenNMSEnvironmentBuilder() {
+        }
+
+        public OpenNMSEnvironmentBuilder optIn(final boolean optIn) {
+            m_optIn = optIn;
+            return this;
+        }
+
+        public OpenNMSEnvironmentBuilder addFile(final String contents, final String target) {
+            final File targetFile = createFile(target);
+            try (final Writer w = new FileWriter(targetFile)) {
+                w.write(contents);
+            } catch (final IOException e) {
+                throw new RuntimeException("Failed to create "+target+" file in $OPENNMS_HOME!", e);
+            }
+            return this;
+        }
+
+        public OpenNMSEnvironmentBuilder addFile(final URL source, final String target) {
+            final File targetFile = createFile(target);
+            try (final InputStream is = source.openStream(); final OutputStream os = new FileOutputStream(targetFile)) {
+                IOUtils.copy(is, os);
+                return this;
+            } catch (final IOException e) {
+                throw new RuntimeException("Failed to copy " + source + " to $OPENNMS_HOME/" + target, e);
+            }
+        }
+
+        public Path build() {
+            final File datachoices = createFile("etc/org.opennms.features.datachoices.cfg");
+            try (final Writer w = new FileWriter(datachoices)) {
+                w.write("enabled=" + m_optIn + "\n" +
+                        "acknowledged-by=admin\n" +
+                        "acknowledged-at=Thu Mar 24 10\\:41\\:25 EDT 2016\n");
+            } catch (final IOException e) {
+                throw new RuntimeException("Failed to create opt-in enabled="+m_optIn+" file in $OPENNMS_HOME/etc!", e);
+            }
+
+            return m_opennmsOverlay;
+        }
+
+        protected File createFile(final String path) {
+            if (m_opennmsOverlay == null) {
+                m_opennmsOverlay = Files.createTempDir().toPath();
+            }
+
+            final Path filePath = m_opennmsOverlay.resolve(path);
+            filePath.getParent().toFile().mkdirs();
+            final File file = filePath.toFile();
+            return file;
+        }
+    }
+
     private static Logger LOG = LoggerFactory.getLogger(TestEnvironmentBuilder.class);
 
     private String m_name = null;
     private boolean m_skipTearDown = false;
     private boolean m_useExisting = false;
-    private boolean m_optIn = false; // opt-out by default; user can specify explicitly by calling .optIn(boolean)
 
     private Set<ContainerAlias> m_containers = new LinkedHashSet<>();
 
-    private Path m_opennmsOverlay;
+    private OpenNMSEnvironmentBuilder m_opennmsEnvironmentBuilder;
 
     public TestEnvironmentBuilder() {
     }
@@ -98,40 +154,9 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
-    public TestEnvironmentBuilder optIn(final boolean optIn) {
-        m_optIn = optIn;
-        return this;
-    }
-
-    public TestEnvironmentBuilder addFile(final String contents, final String target) {
-        final File targetFile = createFile(target);
-        try (final Writer w = new FileWriter(targetFile)) {
-            w.write(contents);
-        } catch (final IOException e) {
-            throw new RuntimeException("Failed to create "+target+" file in $OPENNMS_HOME!", e);
-        }
-        return this;
-    }
-
-    public TestEnvironmentBuilder addFile(final URL source, final String target) {
-        final File targetFile = createFile(target);
-        try (final InputStream is = source.openStream(); final OutputStream os = new FileOutputStream(targetFile)) {
-            IOUtils.copy(is, os);
-            return this;
-        } catch (final IOException e) {
-            throw new RuntimeException("Failed to copy " + source + " to $OPENNMS_HOME/" + target, e);
-        }
-    }
-
-    protected File createFile(final String path) {
-        if (m_opennmsOverlay == null) {
-            m_opennmsOverlay = Files.createTempDir().toPath();
-        }
-
-        final Path filePath = m_opennmsOverlay.resolve(path);
-        filePath.getParent().toFile().mkdirs();
-        final File file = filePath.toFile();
-        return file;
+    public OpenNMSEnvironmentBuilder withOpenNMSEnvironment() {
+        m_opennmsEnvironmentBuilder = new OpenNMSEnvironmentBuilder();
+        return m_opennmsEnvironmentBuilder;
     }
 
     public TestEnvironment build() {
@@ -139,20 +164,13 @@ public class TestEnvironmentBuilder {
             all();
         }
 
-        final File datachoices = createFile("etc/org.opennms.features.datachoices.cfg");
-        try (final Writer w = new FileWriter(datachoices)) {
-            w.write("enabled=" + m_optIn + "\n" +
-                    "acknowledged-by=admin\n" +
-                    "acknowledged-at=Thu Mar 24 10\\:41\\:25 EDT 2016\n");
-        } catch (final IOException e) {
-            throw new RuntimeException("Failed to create opt-in enabled="+m_optIn+" file in $OPENNMS_HOME/etc!", e);
-        }
+        final Path opennmsOverlay = m_opennmsEnvironmentBuilder == null? null : m_opennmsEnvironmentBuilder.build();
 
         LOG.debug("Creating environment with containers: {}", m_containers);
         if (m_useExisting) {
             return new ExistingTestEnvironment();
         } else {
-            return new NewTestEnvironment(m_name, m_skipTearDown, m_opennmsOverlay, m_containers);
+            return new NewTestEnvironment(m_name, m_skipTearDown, opennmsOverlay, m_containers);
         }
     }
 }
