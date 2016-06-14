@@ -243,7 +243,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 LOG.info("Start of stdout/stderr for {}:", containerId);
                 LOG.info("************************************************************");
                 */
-                final Path outputPath = Paths.get("target", getName() + "-" + containerId + "-output.log");
+                final ContainerAlias container = getContainerName(containerId);
+                final String containerName = container == null? containerId : container.toString().toLowerCase();
+                final Path outputPath = Paths.get("target", getName() + "-" + containerName + "-output.log");
                 LOG.info("* writing stdout/stderr for {} to {}", containerId, outputPath);
                 try (final FileWriter fw = new FileWriter(outputPath.toFile())) {
                     fw.write(logStream.readFully());
@@ -293,6 +295,16 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     @Override
     public ContainerInfo getContainerInfo(final ContainerAlias alias) {
         return containerInfoByAlias.get(alias);
+    }
+
+    private ContainerAlias getContainerName(final String containerId) {
+        for (final ContainerAlias alias : start) {
+            final ContainerInfo info = containerInfoByAlias.get(alias);
+            if (containerId.equals(info.id())) {
+                return alias;
+            }
+        }
+        return null;
     }
 
     /**
@@ -488,8 +500,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         final InetSocketAddress httpAddr = getServiceAddress(alias, 8980);
         final RestClient restClient = new RestClient(httpAddr);
         final Callable<String> getDisplayVersion = new Callable<String>() {
-            @Override
-            public String call() throws Exception {
+            @Override public String call() throws Exception {
                 try {
                     final String displayVersion = restClient.getDisplayVersion();
                     LOG.info("Connected to OpenNMS version {}", displayVersion);
@@ -521,6 +532,16 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         LOG.info("************************************************************");
         LOG.info("OpenNMS's Karaf Shell is online.");
         LOG.info("************************************************************");
+
+        /*
+        System.setProperty("sun.rmi.transport.tcp.responseTimeout", "5000");
+        final Callable<Boolean> getJmxConnection = new Callable<Boolean>() {
+            @Override public Boolean call() throws Exception {
+                return null;
+            }
+        };
+        await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(getJmxConnection, is(notNullValue()));
+        */
     }
 
     /**

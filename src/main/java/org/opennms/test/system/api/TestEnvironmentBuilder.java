@@ -8,16 +8,17 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Writer;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.cxf.helpers.IOUtils;
 import org.opennms.test.system.api.NewTestEnvironment.ContainerAlias;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.io.Files;
 
 public class TestEnvironmentBuilder {
     public static class OpenNMSEnvironmentBuilder {
@@ -29,6 +30,34 @@ public class TestEnvironmentBuilder {
 
         public OpenNMSEnvironmentBuilder optIn(final boolean optIn) {
             m_optIn = optIn;
+            return this;
+        }
+
+        public OpenNMSEnvironmentBuilder addFiles(final Path directory, final String targetDirectory) {
+            if (directory == null || !directory.toFile().isDirectory()) {
+                throw new RuntimeException("You must specify a source directory!");
+            }
+
+            final Path root = directory.toAbsolutePath();
+            try (final Stream<Path> paths = Files.walk(root)) {
+                paths.forEach(from -> {
+                    if (from.toFile().isDirectory()) {
+                        return;
+                    }
+                    System.err.println("from="+from);
+                    final Path to = Paths.get(targetDirectory).resolve(root.relativize(from));
+                    System.err.println("to="+to);
+                    //System.err.println(root.relativize(from));
+                    try {
+                        addFile(from.toFile().toURI().toURL(), to.toString());
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to copy " + from + " to " + to);
+                    }
+                });
+            } catch (final Exception e) {
+                throw new RuntimeException("failed to walk directory " + root, e);
+            }
+
             return this;
         }
 
@@ -67,7 +96,11 @@ public class TestEnvironmentBuilder {
 
         protected File createFile(final String path) {
             if (m_opennmsOverlay == null) {
-                m_opennmsOverlay = Files.createTempDir().toPath();
+                try {
+                    m_opennmsOverlay = Files.createTempDirectory("opennms-overlay").toAbsolutePath();
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to create opennms-overlay temporary directory!");
+                }
             }
 
             final Path filePath = m_opennmsOverlay.resolve(path);
