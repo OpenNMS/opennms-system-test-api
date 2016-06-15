@@ -15,5 +15,14 @@ echo "id = 00000000-0000-0000-0000-000000ddba11" >> $MINION_HOME/etc/org.opennms
 echo "http-url = http://${OPENNMS_PORT_8980_TCP_ADDR}:${OPENNMS_PORT_8980_TCP_PORT}" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg
 echo "broker-url = tcp://${OPENNMS_PORT_61616_TCP_ADDR}:${OPENNMS_PORT_61616_TCP_PORT}" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg
 
+echo "Overlaying files from /minion-docker-overlay/ onto ${MINION_HOME}"
+find /minion-docker-overlay -ls
+rsync -ar /minion-docker-overlay/ "${MINION_HOME}"/
+
 rm -rf $MINION_HOME/data
-$MINION_HOME/bin/karaf clean server
+
+if [ -e "${MINION_HOME}/etc/clean.disabled" ]; then
+	$MINION_HOME/bin/karaf server
+else
+	$MINION_HOME/bin/karaf clean server
+fi

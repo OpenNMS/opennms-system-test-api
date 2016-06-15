@@ -22,6 +22,8 @@ RUN yum install -y /*.rpm && \
 COPY etc/opennms.conf /opt/opennms/etc/opennms.conf
 COPY scripts /opt/opennms/bin
  
+RUN mkdir -p /opt/opennms/data/log
+
 # Ports
 # 1099 - RMI
 # 5817 - Eventd XML

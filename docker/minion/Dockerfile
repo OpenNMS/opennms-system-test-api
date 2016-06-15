@@ -9,6 +9,8 @@ RUN yum install -y /*.rpm && \
 COPY etc     /opt/minion/etc
 COPY scripts /opt/minion/bin
 
+RUN mkdir -p /opt/minion/data/log
+
 # Ports
 # 162   - SNMP traps
 # 1299  - RMI Registry

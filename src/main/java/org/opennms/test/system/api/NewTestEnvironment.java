@@ -43,6 +43,7 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -148,6 +149,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     private DockerClient docker;
 
+    private boolean m_overlayRootInitialized = false;
+
     public NewTestEnvironment(final String name, final boolean skipTearDown, final Path overlayDirectory, final Collection<ContainerAlias> containers) {
         this.skipTearDown = skipTearDown;
         this.overlayDirectory = overlayDirectory;
@@ -216,6 +219,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         } else {
             LOG.warn("No OpenNMS container provisioned. Logs won't be copied.");
         }
+         */
 
         // Ideally, we would only gather the logs and container output
         // when we fail, but we can't detect this when using @ClassRules
@@ -230,7 +234,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         } else {
             LOG.warn("No Minion container provisioned. Logs won't be copied.");
         }
-         */
 
         LOG.info("************************************************************");
         LOG.info("Gathering container output...");
@@ -242,7 +245,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 LOG.info("************************************************************");
                 LOG.info("Start of stdout/stderr for {}:", containerId);
                 LOG.info("************************************************************");
-                */
+                 */
                 final ContainerAlias container = getContainerName(containerId);
                 final String containerName = container == null? containerId : container.toString().toLowerCase();
                 final Path outputPath = Paths.get("target", getName() + "-" + containerName + "-output.log");
@@ -257,7 +260,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 LOG.info("************************************************************");
                 LOG.info("End of stdout/stderr for {}:", containerId);
                 LOG.info("************************************************************");
-                */
+                 */
             } catch (final DockerException | InterruptedException e) {
                 LOG.warn("Failed to get stdout/stderr for container {}.", e);
             }
@@ -330,10 +333,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
-        final Path overlayRoot = Paths.get("target", "overlays", getName()).toAbsolutePath();
-        if (overlayRoot.toFile().exists()) {
-            FileUtils.removeDir(overlayRoot.toFile());
-        }
+        final Path overlayRoot = initializeOverlayRoot();
 
         final Path opennmsOverlay = overlayRoot.resolve("opennms-overlay");
         final Path opennmsLogs = overlayRoot.resolve("opennms-logs");
@@ -406,6 +406,21 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
+        final Path overlayRoot = initializeOverlayRoot();
+
+        final Path minionOverlay = overlayRoot.resolve("minion-overlay");
+        final Path minionKarafLogs = overlayRoot.resolve("minion-karaf-logs");
+        Files.createDirectories(minionOverlay.resolve("etc"));
+        Files.createDirectories(minionKarafLogs);
+
+        try(final FileWriter fw = new FileWriter(minionOverlay.resolve("etc/clean.disabled").toFile())) {
+            fw.write("true\n".toCharArray());
+        }
+
+        final List<String> binds = new ArrayList<>();
+        binds.add(minionOverlay.toString() + ":/minion-docker-overlay");
+        //binds.add(minionKarafLogs.toString() + ":/opt/minion/data/log");
+
         final List<String> links = Lists.newArrayList();
         links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
         links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
@@ -413,8 +428,18 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         final Builder builder = HostConfig.builder()
                 .publishAllPorts(true)
-                .links(links);
+                .links(links)
+                .binds(binds);
         spawnContainer(alias, builder);
+    }
+
+    private Path initializeOverlayRoot() {
+        final Path overlayRoot = Paths.get("target", "overlays", getName()).toAbsolutePath();
+        if (!m_overlayRootInitialized && overlayRoot.toFile().exists()) {
+            FileUtils.removeDir(overlayRoot.toFile());
+            m_overlayRootInitialized = true;
+        }
+        return overlayRoot;
     }
 
     private boolean isEnabled(final ContainerAlias alias) {
@@ -513,7 +538,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         };
 
         LOG.info("************************************************************");
-        LOG.info("Waiting for REST service @ {}.", httpAddr);
+        LOG.info("Waiting for OpenNMS REST service @ {}.", httpAddr);
         LOG.info("************************************************************");
         // TODO: It's possible that the OpenNMS server doesn't start if there are any
         // problems in $OPENNMS_HOME/etc. Instead of waiting the whole 5 minutes and timing out
@@ -525,7 +550,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         final InetSocketAddress sshAddr = getServiceAddress(alias, 8101);
         LOG.info("************************************************************");
-        LOG.info("Waiting for SSH service @ {}.", sshAddr);
+        LOG.info("Waiting for OpenNMS SSH service @ {}.", sshAddr);
         LOG.info("************************************************************");
         await().atMost(2, MINUTES).pollInterval(5, SECONDS).until(SshClient.canConnectViaSsh(sshAddr, "admin", "admin"));
         listFeatures(sshAddr, false);
@@ -541,7 +566,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             }
         };
         await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(getJmxConnection, is(notNullValue()));
-        */
+         */
     }
 
     /**
@@ -577,7 +602,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         final InetSocketAddress sshAddr = getServiceAddress(alias, 8201);
         LOG.info("************************************************************");
-        LOG.info("Waiting for SSH service for Karaf instance @ {}.", sshAddr);
+        LOG.info("Waiting for Minion SSH service for Karaf instance @ {}.", sshAddr);
         LOG.info("************************************************************");
         await().atMost(2, MINUTES).pollInterval(5, SECONDS).until(SshClient.canConnectViaSsh(sshAddr, "admin", "admin"));
         listFeatures(sshAddr, true);
