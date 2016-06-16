@@ -437,8 +437,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         final Path overlayRoot = Paths.get("target", "overlays", getName()).toAbsolutePath();
         if (!m_overlayRootInitialized && overlayRoot.toFile().exists()) {
             FileUtils.removeDir(overlayRoot.toFile());
-            m_overlayRootInitialized = true;
         }
+        m_overlayRootInitialized = true;
         return overlayRoot;
     }
 
