@@ -65,6 +65,9 @@ public class SshClient implements AutoCloseable {
     private InputStream stdout;
     private InputStream stderr;
 
+    private final StringBuffer stdoutBuff = new StringBuffer();
+    private final StringBuffer stderrBuff = new StringBuffer();
+
     private final InetSocketAddress addr;
     private final String username;
     private final String password;
@@ -99,11 +102,17 @@ public class SshClient implements AutoCloseable {
     }
 
     public String getStdout() throws IOException {
-        return readAvailableBytes(stdout);
+        // Prepend the contents of the buffer, which may be have populated by isShellClosed()
+        final String stdoutContents = stdoutBuff.toString() + readAvailableBytes(stdout);
+        stdoutBuff.setLength(0);
+        return stdoutContents;
     }
 
     public String getStderr() throws IOException {
-        return readAvailableBytes(stderr);
+        // Prepend the contents of the buffer, which may be have populated by isShellClosed()
+        final String stderrContents = stderrBuff.toString() + readAvailableBytes(stderr);
+        stderrBuff.setLength(0);
+        return stderrContents;
     }
 
     public void setTimeout(int timeoutInMs) {
@@ -133,6 +142,21 @@ public class SshClient implements AutoCloseable {
         if (channel == null) {
             return true;
         }
+
+        // In certain cases the shell won't close unless we read the available
+        // bytes from the stdout and stderr streams.
+        try {
+            stdoutBuff.append(getStdout());
+        } catch (IOException e) {
+            // pass
+        }
+
+        try {
+            stderrBuff.append(getStderr());
+        } catch (IOException e) {
+            // pass
+        }
+
         return channel.isClosed();
     }
 
