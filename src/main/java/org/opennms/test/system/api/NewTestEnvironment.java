@@ -166,17 +166,19 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     protected void before() throws Throwable {
         docker = DefaultDockerClient.fromEnv().build();
 
+        LOG.debug("Starting PostgreSQL");
+        spawnPostgres();
+        waitForPostgres();
+
         LOG.debug("Starting containers: {}", start);
 
-        spawnPostgres();
         spawnOpenNMS();
         spawnSnmpd();
         spawnTomcat();
         spawnMinion();
 
-        LOG.debug("Waiting for containers to be ready: {}", start);
+        LOG.debug("Waiting for other containers to be ready: {}", start);
 
-        waitForPostgres();
         waitForOpenNMS();
         waitForSnmpd();
         waitForTomcat();
