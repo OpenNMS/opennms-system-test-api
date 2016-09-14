@@ -8,6 +8,7 @@ RUN yum install -y \
 	jrrd \
 	jrrd2 \
 	postgresql \
+	postgresql-server \
 	R && \
 	yum -y clean all
 
