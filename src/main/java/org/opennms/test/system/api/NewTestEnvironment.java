@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.cxf.helpers.FileUtils;
 import org.opennms.test.system.api.utils.RestClient;
 import org.opennms.test.system.api.utils.SshClient;
@@ -604,10 +605,34 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         final InetSocketAddress sshAddr = getServiceAddress(alias, 8201);
         LOG.info("************************************************************");
-        LOG.info("Waiting for Minion SSH service for Karaf instance @ {}.", sshAddr);
+        LOG.info("Waiting for Minion @ {} to establish connectivity with OpenNMS instance.", sshAddr);
         LOG.info("************************************************************");
-        await().atMost(2, MINUTES).pollInterval(5, SECONDS).until(SshClient.canConnectViaSsh(sshAddr, "admin", "admin"));
+        await().atMost(3, MINUTES).pollInterval(5, SECONDS).until(() -> canMinionConnectToOpenNMS(sshAddr));
         listFeatures(sshAddr, true);
+    }
+
+    public boolean canMinionConnectToOpenNMS(InetSocketAddress sshAddr) throws Exception {
+        try (final SshClient sshClient = new SshClient(sshAddr, "admin", "admin")) {
+            // Issue the 'minion:ping' command
+            PrintStream pipe = sshClient.openShell();
+            pipe.println("minion:ping");
+            pipe.println("logout");
+            await().atMost(1, MINUTES).until(sshClient.isShellClosedCallable());
+
+            // Grab the output
+            String shellOutput = sshClient.getStdout();
+            LOG.info("minion:ping output: {}", shellOutput);
+
+            // We're expecting output of the form
+            // admin@minion> minion:ping
+            // Connecting to ReST...
+            // OK
+            // Connecting to Broker...
+            // OK
+            //
+            // So it is sufficient to check for 2 'OK's
+            return StringUtils.countMatches(shellOutput, "OK") == 2;
+        }
     }
 
     private static void listFeatures(InetSocketAddress sshAddr, boolean karaf4) throws Exception {
