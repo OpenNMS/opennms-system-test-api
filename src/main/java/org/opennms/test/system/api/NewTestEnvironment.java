@@ -224,19 +224,22 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
          */
 
+        /*
+         * Logs are in an overlay now.
         // Ideally, we would only gather the logs and container output
         // when we fail, but we can't detect this when using @ClassRules
-        final ContainerInfo minionContainerInfo = getContainerInfo(ContainerAlias.MINION);
+                final ContainerInfo minionContainerInfo = getContainerInfo(ContainerAlias.MINION);
         if (minionContainerInfo != null && start.contains(ContainerAlias.MINION)) {
-            try (final InputStream in = docker.copyContainer(minionContainerInfo.id(), "/opt/minion/data/log")) {
-                final Path destination = Paths.get("target", getName() + "-minion.logs.tar");
-                Files.copy(in,  destination, StandardCopyOption.REPLACE_EXISTING);
+            final Path destination = Paths.get("target", getName() + "-minion.logs.tar");
+            try (final InputStream in = docker.archiveContainer(minionContainerInfo.id(), "/opt/minion/data/log")) {
+                Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
             } catch (DockerException|InterruptedException|IOException e) {
                 LOG.warn("Failed to copy the logs directory from the Minion container.", e);
             }
         } else {
             LOG.warn("No Minion container provisioned. Logs won't be copied.");
         }
+        */
 
         LOG.info("************************************************************");
         LOG.info("Gathering container output...");
@@ -422,7 +425,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         final List<String> binds = new ArrayList<>();
         binds.add(minionOverlay.toString() + ":/minion-docker-overlay");
-        //binds.add(minionKarafLogs.toString() + ":/opt/minion/data/log");
+        binds.add(minionKarafLogs.toString() + ":/opt/minion/data/log");
 
         final List<String> links = Lists.newArrayList();
         links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));

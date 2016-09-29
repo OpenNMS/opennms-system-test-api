@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 MINION_HOME=/opt/minion
 
 echo "MINION HOME: ${MINION_HOME}"
@@ -19,7 +19,10 @@ echo "Overlaying files from /minion-docker-overlay/ onto ${MINION_HOME}"
 find /minion-docker-overlay -ls
 rsync -ar /minion-docker-overlay/ "${MINION_HOME}"/
 
-rm -rf $MINION_HOME/data
+find "${MINION_HOME}/data" -type d | grep -vE "(data|data/log)$" | sort -ur | while read DIR; do
+	rm -rf "$DIR"
+done
+rm -rf "${MINION_HOME}/data/log"/*
 
 if [ -e "${MINION_HOME}/etc/clean.disabled" ]; then
 	$MINION_HOME/bin/karaf server
