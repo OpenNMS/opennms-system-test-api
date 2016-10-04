@@ -613,37 +613,35 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, true));
     }
 
-    public boolean canMinionConnectToOpenNMS(InetSocketAddress sshAddr) throws Exception {
+    public boolean canMinionConnectToOpenNMS(InetSocketAddress sshAddr) {
         try (final SshClient sshClient = new SshClient(sshAddr, "admin", "admin")) {
             // Issue the 'minion:ping' command
             PrintStream pipe = sshClient.openShell();
             pipe.println("minion:ping");
             pipe.println("logout");
 
-            try {
-                await().atMost(2, MINUTES).until(sshClient.isShellClosedCallable());
+            await().atMost(2, MINUTES).until(sshClient.isShellClosedCallable());
 
-                // Grab the output
-                String shellOutput = sshClient.getStdout();
-                LOG.info("minion:ping output: {}", shellOutput);
+            // Grab the output
+            String shellOutput = sshClient.getStdout();
+            LOG.info("minion:ping output: {}", shellOutput);
 
-                // We're expecting output of the form
-                // admin@minion> minion:ping
-                // Connecting to ReST...
-                // OK
-                // Connecting to Broker...
-                // OK
-                //
-                // So it is sufficient to check for 2 'OK's
-                return StringUtils.countMatches(shellOutput, "OK") >= 2;
-            } catch (final Exception e) {
-                LOG.error("Failed to ping the Minion from OpenNMS: {}", sshClient.getStderr(), e);
-            }
+            // We're expecting output of the form
+            // admin@minion> minion:ping
+            // Connecting to ReST...
+            // OK
+            // Connecting to Broker...
+            // OK
+            //
+            // So it is sufficient to check for 2 'OK's
+            return StringUtils.countMatches(shellOutput, "OK") >= 2;
+        } catch (Exception e) {
+            LOG.error("Failed to reach the Minion from OpenNMS.", e);
         }
         return false;
     }
 
-    private static boolean listFeatures(final InetSocketAddress sshAddr, final boolean karaf4) throws Exception {
+    private static boolean listFeatures(final InetSocketAddress sshAddr, final boolean karaf4) {
         try (final SshClient sshClient = new SshClient(sshAddr, "admin", "admin")) {
             final PrintStream pipe = sshClient.openShell();
             if (karaf4) {
@@ -657,11 +655,11 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 await().atMost(2, MINUTES).until(sshClient.isShellClosedCallable());
                 // exit listFeatures() on success
                 return true;
-            } catch (final Exception e) {
-                LOG.error("Failed to list features: {}", sshClient.getStderr(), e);
             } finally {
                 LOG.info("Features installed:\n{}", sshClient.getStdout());
             }
+        } catch (final Exception e) {
+            LOG.error("Failed to list features.", e);
         }
         return false;
     }
