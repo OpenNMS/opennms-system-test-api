@@ -619,22 +619,28 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             PrintStream pipe = sshClient.openShell();
             pipe.println("minion:ping");
             pipe.println("logout");
-            await().atMost(1, MINUTES).until(sshClient.isShellClosedCallable());
 
-            // Grab the output
-            String shellOutput = sshClient.getStdout();
-            LOG.info("minion:ping output: {}", shellOutput);
+            try {
+                await().atMost(2, MINUTES).until(sshClient.isShellClosedCallable());
 
-            // We're expecting output of the form
-            // admin@minion> minion:ping
-            // Connecting to ReST...
-            // OK
-            // Connecting to Broker...
-            // OK
-            //
-            // So it is sufficient to check for 2 'OK's
-            return StringUtils.countMatches(shellOutput, "OK") >= 2;
+                // Grab the output
+                String shellOutput = sshClient.getStdout();
+                LOG.info("minion:ping output: {}", shellOutput);
+
+                // We're expecting output of the form
+                // admin@minion> minion:ping
+                // Connecting to ReST...
+                // OK
+                // Connecting to Broker...
+                // OK
+                //
+                // So it is sufficient to check for 2 'OK's
+                return StringUtils.countMatches(shellOutput, "OK") >= 2;
+            } catch (final Exception e) {
+                LOG.error("Failed to ping the Minion from OpenNMS: {}", sshClient.getStderr(), e);
+            }
         }
+        return false;
     }
 
     private static boolean listFeatures(final InetSocketAddress sshAddr, final boolean karaf4) throws Exception {
@@ -652,7 +658,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 // exit listFeatures() on success
                 return true;
             } catch (final Exception e) {
-                LOG.error("Failed to list features: {}", sshClient.getStderr());
+                LOG.error("Failed to list features: {}", sshClient.getStderr(), e);
             } finally {
                 LOG.info("Features installed:\n{}", sshClient.getStdout());
             }
