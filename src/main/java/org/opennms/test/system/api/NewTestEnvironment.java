@@ -43,7 +43,6 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -559,7 +558,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         LOG.info("Waiting for OpenNMS SSH service @ {}.", sshAddr);
         LOG.info("************************************************************");
         await().atMost(2, MINUTES).pollInterval(5, SECONDS).until(SshClient.canConnectViaSsh(sshAddr, "admin", "admin"));
-        listFeatures(sshAddr, false);
+        await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, false));
         LOG.info("************************************************************");
         LOG.info("OpenNMS's Karaf Shell is online.");
         LOG.info("************************************************************");
@@ -610,8 +609,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         LOG.info("************************************************************");
         LOG.info("Waiting for Minion @ {} to establish connectivity with OpenNMS instance.", sshAddr);
         LOG.info("************************************************************");
-        await().atMost(3, MINUTES).pollInterval(5, SECONDS).until(() -> canMinionConnectToOpenNMS(sshAddr));
-        listFeatures(sshAddr, true);
+        await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> canMinionConnectToOpenNMS(sshAddr));
+        await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, true));
     }
 
     public boolean canMinionConnectToOpenNMS(InetSocketAddress sshAddr) throws Exception {
@@ -634,15 +633,13 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             // OK
             //
             // So it is sufficient to check for 2 'OK's
-            return StringUtils.countMatches(shellOutput, "OK") == 2;
+            return StringUtils.countMatches(shellOutput, "OK") >= 2;
         }
     }
 
-    private static void listFeatures(InetSocketAddress sshAddr, boolean karaf4) throws Exception {
-        try (
-                final SshClient sshClient = new SshClient(sshAddr, "admin", "admin");
-                ) {
-            PrintStream pipe = sshClient.openShell();
+    private static boolean listFeatures(final InetSocketAddress sshAddr, final boolean karaf4) throws Exception {
+        try (final SshClient sshClient = new SshClient(sshAddr, "admin", "admin")) {
+            final PrintStream pipe = sshClient.openShell();
             if (karaf4) {
                 pipe.println("feature:list -i");
             } else {
@@ -652,10 +649,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             pipe.println("logout");
             try {
                 await().atMost(2, MINUTES).until(sshClient.isShellClosedCallable());
+                // exit listFeatures() on success
+                return true;
+            } catch (final Exception e) {
+                LOG.error("Failed to list features: {}", sshClient.getStderr());
             } finally {
                 LOG.info("Features installed:\n{}", sshClient.getStdout());
             }
         }
+        return false;
     }
 
     @Override
