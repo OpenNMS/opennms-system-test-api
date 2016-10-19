@@ -12,8 +12,8 @@ run docker pull postgres:9.5.1
 echo "Building base image"
 run docker build -t stests/base ./base
 
-echo "Building Ubuntu base image"
-run docker build -t stests/ubuntu-base ./ubuntu-base
+#echo "Building Ubuntu base image"
+#run docker build -t stests/ubuntu-base ./ubuntu-base
 
 if [ `ls -1 minion/rpms/*.rpm | wc -l` -gt 0 ]; then
 	echo "Building Minion image"
