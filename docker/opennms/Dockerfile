@@ -14,7 +14,8 @@ RUN yum install -y \
 
 # Install OpenNMS & Hawtio
 ADD /rpms/*.rpm /
-RUN yum install -y /*.rpm && \
+RUN ls -la /*.rpm && \
+	yum install -y /*.rpm && \
 	rm -rf /*.rpm && \
 	yum -y clean all && \
 	wget -qO /opt/opennms/jetty-webapps/hawtio.war https://oss.sonatype.org/content/repositories/public/io/hawt/hawtio-default/1.4.63/hawtio-default-1.4.63.war && \

@@ -2,7 +2,8 @@ FROM stests/base
 MAINTAINER jesse@opennms.org
 
 ADD /rpms/*.rpm /
-RUN yum install -y /*.rpm && \
+RUN ls -la /*.rpm && \
+	yum install -y /*.rpm && \
 	rm -rf /*.rpm && \
 	yum -y clean all
 
