@@ -15,7 +15,7 @@ run docker build -t stests/base ./base
 #echo "Building Ubuntu base image"
 #run docker build -t stests/ubuntu-base ./ubuntu-base
 
-if [ `ls -1 minion/rpms/*.rpm | wc -l` -gt 0 ]; then
+if [ `find minion/rpms -name \*.rpm | wc -l` -gt 0 ]; then
 	echo "Building Minion image"
 	run docker build -t stests/minion ./minion
 else
