@@ -1,16 +1,5 @@
-FROM stests/base
-MAINTAINER jesse@opennms.org
-
-# Install OpenNMS dependencies
-RUN yum install -y \
-	jicmp \
-	jicmp6 \
-	jrrd \
-	jrrd2 \
-	postgresql \
-	postgresql-server \
-	R && \
-	yum -y clean all
+FROM stests/opennms-base
+MAINTAINER ranger@opennms.org
 
 # Install OpenNMS
 ADD /rpms/*.rpm /

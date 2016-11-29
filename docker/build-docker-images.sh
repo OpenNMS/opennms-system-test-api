@@ -12,6 +12,9 @@ run docker pull postgres:9.5.1
 echo "Building base image"
 run docker build -t stests/base ./base
 
+echo "Building OpenNMS base image"
+run docker build -t stests/opennms-base ./opennms-base
+
 #echo "Building Ubuntu base image"
 #run docker build -t stests/ubuntu-base ./ubuntu-base
 
