@@ -151,6 +151,15 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
+    public TestEnvironmentBuilder kafka() {
+        if (m_containers.contains(ContainerAlias.KAFKA)) {
+            return this;
+        }
+
+        m_containers.add(ContainerAlias.KAFKA);
+        return this;
+    }
+
     public TestEnvironmentBuilder opennms() {
         if (m_containers.contains(ContainerAlias.OPENNMS)) {
             return this;

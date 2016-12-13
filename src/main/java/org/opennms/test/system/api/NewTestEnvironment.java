@@ -38,13 +38,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,6 +75,7 @@ import com.spotify.docker.client.messages.ContainerCreation;
 import com.spotify.docker.client.messages.ContainerInfo;
 import com.spotify.docker.client.messages.HostConfig;
 import com.spotify.docker.client.messages.HostConfig.Builder;
+import com.spotify.docker.client.messages.PortBinding;
 
 /**
  * Spawns and configures a collection of Docker containers running the Minion TestEnvironment.
@@ -81,6 +86,7 @@ import com.spotify.docker.client.messages.HostConfig.Builder;
  *  3) minion: An instance of Minion
  *  4) snmpd: An instance of Net-SNMP (used to test SNMP support)
  *  5) tomcat: An instance of Tomcat (used to test JMX support)
+ *  6) kafka: An optional instance of Apache Kafka to test Minion's Kafka support
  *
  * @author jwhite
  */
@@ -94,6 +100,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     public static enum ContainerAlias {
         POSTGRES,
+        KAFKA,
         OPENNMS,
         MINION,
         SNMPD,
@@ -106,6 +113,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     public static final ImmutableMap<ContainerAlias, String> IMAGES_BY_ALIAS =
             new ImmutableMap.Builder<ContainerAlias, String>()
             .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
+            .put(ContainerAlias.KAFKA, "spotify/kafka")
             .put(ContainerAlias.OPENNMS, "stests/opennms")
             .put(ContainerAlias.MINION, "stests/minion")
             .put(ContainerAlias.SNMPD, "stests/snmpd")
@@ -166,7 +174,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     protected void before() throws Throwable {
         docker = DefaultDockerClient.fromEnv().build();
 
-        LOG.debug("Starting PostgreSQL");
+        spawnKafka();
+
         spawnPostgres();
         waitForPostgres();
 
@@ -324,9 +333,39 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
+        LOG.debug("Starting PostgreSQL");
+
         final Builder builder = HostConfig.builder()
                 .publishAllPorts(true);
         spawnContainer(alias, builder);
+    }
+
+    /**
+     * Spawns the Apache Kafka container.
+     */
+    private void spawnKafka() throws DockerException, InterruptedException, IOException {
+        final ContainerAlias alias = ContainerAlias.KAFKA;
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
+        }
+
+        LOG.debug("Starting Kafka");
+
+        // Bind Kafka and Zookeeper to the same ports on the Docker host
+        final Map<String, List<PortBinding>> portBindings = new HashMap<String, List<PortBinding>>();
+        for (String port : new String[] { "2181", "9092" }) {
+            portBindings.put(port, Collections.singletonList(PortBinding.of("0.0.0.0", port)));
+        }
+
+        // Advertise Kafka on the Docker host address
+        List<String> env = Arrays.asList(new String[] {
+            "ADVERTISED_HOST=" + InetAddress.getLocalHost().getHostAddress(),
+            "ADVERTISED_PORT=" + portBindings.get("9092").get(0).hostPort()
+        });
+
+        final Builder builder = HostConfig.builder()
+                .portBindings(portBindings);
+        spawnContainer(alias, builder, env);
     }
 
     /**
@@ -459,10 +498,20 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      * Spawns a container.
      */
     private void spawnContainer(final ContainerAlias alias, final Builder hostConfigBuilder) throws DockerException, InterruptedException, IOException {
+        spawnContainer(alias, hostConfigBuilder, Collections.emptyList());
+    }
+
+    /**
+     * Spawns a container.
+     */
+    private void spawnContainer(final ContainerAlias alias, final Builder hostConfigBuilder, final List<String> env) throws DockerException, InterruptedException, IOException {
+    	final HostConfig hostConfig = hostConfigBuilder.build();
         final ContainerConfig containerConfig = ContainerConfig.builder()
                 .image(IMAGES_BY_ALIAS.get(alias))
-                .hostConfig(hostConfigBuilder.build())
+                .hostConfig(hostConfig)
                 .hostname(getName() + ".local")
+                .env(env)
+                .exposedPorts(hostConfig.portBindings() != null ? hostConfig.portBindings().keySet() : Collections.emptySet())
                 .build();
 
         final ContainerCreation containerCreation = docker.createContainer(containerConfig);
