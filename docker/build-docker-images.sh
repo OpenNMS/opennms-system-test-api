@@ -9,6 +9,9 @@ run() {
 echo "Pulling postgres image from public registry"
 run docker pull postgres:9.5.1
 
+echo "Pulling kafka 0.10.1.0 with scala 2.11 image from public registry"
+run docker pull spotify/kafka@sha256:cf8f8f760b48a07fb99df24fab8201ec8b647634751e842b67103a25a388981b
+
 echo "Building base image"
 run docker build -t stests/base ./base
 
