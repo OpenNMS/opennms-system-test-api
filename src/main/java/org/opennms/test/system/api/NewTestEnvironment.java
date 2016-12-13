@@ -113,7 +113,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     public static final ImmutableMap<ContainerAlias, String> IMAGES_BY_ALIAS =
             new ImmutableMap.Builder<ContainerAlias, String>()
             .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
-            .put(ContainerAlias.KAFKA, "spotify/kafka")
+            .put(ContainerAlias.KAFKA, "spotify/kafka@sha256:cf8f8f760b48a07fb99df24fab8201ec8b647634751e842b67103a25a388981b")
             .put(ContainerAlias.OPENNMS, "stests/opennms")
             .put(ContainerAlias.MINION, "stests/minion")
             .put(ContainerAlias.SNMPD, "stests/snmpd")
