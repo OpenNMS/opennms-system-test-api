@@ -135,7 +135,9 @@ public class TestEnvironmentBuilder {
 
     public TestEnvironmentBuilder all() {
         opennms();
-        minion();
+        minion1();
+        minion2();
+        minion3();
         snmpd();
         tomcat();
 
@@ -170,11 +172,25 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
-    public TestEnvironmentBuilder minion() {
-        if (m_containers.contains(ContainerAlias.MINION)) {
+    public TestEnvironmentBuilder minion1() {
+        if (m_containers.contains(ContainerAlias.MINION1)) {
             return this;
         }
-        m_containers.add(ContainerAlias.MINION);
+        m_containers.add(ContainerAlias.MINION1);
+        return this;
+    }
+    public TestEnvironmentBuilder minion2() {
+        if (m_containers.contains(ContainerAlias.MINION2)) {
+            return this;
+        }
+        m_containers.add(ContainerAlias.MINION2);
+        return this;
+    }
+    public TestEnvironmentBuilder minion3() {
+        if (m_containers.contains(ContainerAlias.MINION3)) {
+            return this;
+        }
+        m_containers.add(ContainerAlias.MINION3);
         return this;
     }
 
