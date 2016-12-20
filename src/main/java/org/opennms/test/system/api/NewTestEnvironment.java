@@ -49,6 +49,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,6 +85,7 @@ import com.spotify.docker.client.messages.PortBinding;
  *  1) postgres: An instance of PostgreSQL 
  *  2) opennms: An instance of OpenNMS
  *  3) minion: An instance of Minion
+ *  3) minion: An instance of Minion
  *  4) snmpd: An instance of Net-SNMP (used to test SNMP support)
  *  5) tomcat: An instance of Tomcat (used to test JMX support)
  *  6) kafka: An optional instance of Apache Kafka to test Minion's Kafka support
@@ -98,14 +100,22 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      * Aliases used to refer to the containers within the tests
      * Note that these are not the container IDs or names
      */
-    public static enum ContainerAlias {
+    public enum ContainerAlias {
         POSTGRES,
         KAFKA,
         OPENNMS,
         MINION,
+        MINION_SAME_LOCATION,
+        MINION_OTHER_LOCATION,
         SNMPD,
         TOMCAT
     }
+
+    public static final EnumMap<ContainerAlias, String> MINION_LOCATIONS = new EnumMap<ContainerAlias, String>(ContainerAlias.class) {{
+        this.put(ContainerAlias.MINION, "MINION");
+        this.put(ContainerAlias.MINION_SAME_LOCATION, "MINION");
+        this.put(ContainerAlias.MINION_OTHER_LOCATION, "BANANA");
+    }};
 
     /**
      * Mapping from the alias to the Docker image name
@@ -116,6 +126,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             .put(ContainerAlias.KAFKA, "spotify/kafka@sha256:cf8f8f760b48a07fb99df24fab8201ec8b647634751e842b67103a25a388981b")
             .put(ContainerAlias.OPENNMS, "stests/opennms")
             .put(ContainerAlias.MINION, "stests/minion")
+            .put(ContainerAlias.MINION_SAME_LOCATION, "stests/minion")
+            .put(ContainerAlias.MINION_OTHER_LOCATION, "stests/minion")
             .put(ContainerAlias.SNMPD, "stests/snmpd")
             .put(ContainerAlias.TOMCAT, "stests/tomcat")
             .build();
@@ -184,14 +196,14 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnOpenNMS();
         spawnSnmpd();
         spawnTomcat();
-        spawnMinion();
+        spawnMinions();
 
         LOG.debug("Waiting for other containers to be ready: {}", start);
 
         waitForOpenNMS();
         waitForSnmpd();
         waitForTomcat();
-        waitForMinion();
+        waitForMinions();
     };
 
     @Override
@@ -337,7 +349,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         final Builder builder = HostConfig.builder()
                 .publishAllPorts(true);
-        spawnContainer(alias, builder);
+        spawnContainer(alias, builder, Collections.emptyList());
     }
 
     /**
@@ -414,7 +426,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 .links(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()))
                 .binds(binds);
 
-        spawnContainer(alias, builder);
+        spawnContainer(alias, builder, Collections.emptyList());
     }
 
     /**
@@ -426,7 +438,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
-        spawnContainer(alias, HostConfig.builder());
+        spawnContainer(alias, HostConfig.builder(), Collections.emptyList());
     }
 
     /**
@@ -438,43 +450,44 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
-        spawnContainer(alias, HostConfig.builder());
+        spawnContainer(alias, HostConfig.builder(), Collections.emptyList());
     }
 
     /**
      * Spawns the Minion container, linked to OpenNMS, Net-SNMP and Tomcat.
      */
-    private void spawnMinion() throws DockerException, InterruptedException, IOException {
-        final ContainerAlias alias = ContainerAlias.MINION;
-        if (!(isEnabled(alias) && isSpawned(alias))) {
-            return;
+    private void spawnMinions() throws DockerException, InterruptedException, IOException {
+        for (final ContainerAlias alias : Arrays.asList(ContainerAlias.MINION, ContainerAlias.MINION_SAME_LOCATION, ContainerAlias.MINION_OTHER_LOCATION)) {
+            if (!(isEnabled(alias) && isSpawned(alias))) {
+                return;
+            }
+
+            final Path overlayRoot = initializeOverlayRoot();
+
+            final Path minionOverlay = overlayRoot.resolve("minion-overlay");
+            final Path minionKarafLogs = overlayRoot.resolve("minion-karaf-logs");
+            Files.createDirectories(minionOverlay.resolve("etc"));
+            Files.createDirectories(minionKarafLogs);
+
+            try (final FileWriter fw = new FileWriter(minionOverlay.resolve("etc/clean.disabled").toFile())) {
+                fw.write("true\n".toCharArray());
+            }
+
+            final List<String> binds = new ArrayList<>();
+            binds.add(minionOverlay.toString() + ":/minion-docker-overlay");
+            binds.add(minionKarafLogs.toString() + ":/opt/minion/data/log");
+
+            final List<String> links = Lists.newArrayList();
+            links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
+            links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
+            links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
+
+            final Builder builder = HostConfig.builder()
+                                              .publishAllPorts(true)
+                                              .links(links)
+                                              .binds(binds);
+            spawnContainer(alias, builder, Collections.singletonList("MINION_LOCATION=" + MINION_LOCATIONS.get(alias)));
         }
-
-        final Path overlayRoot = initializeOverlayRoot();
-
-        final Path minionOverlay = overlayRoot.resolve("minion-overlay");
-        final Path minionKarafLogs = overlayRoot.resolve("minion-karaf-logs");
-        Files.createDirectories(minionOverlay.resolve("etc"));
-        Files.createDirectories(minionKarafLogs);
-
-        try(final FileWriter fw = new FileWriter(minionOverlay.resolve("etc/clean.disabled").toFile())) {
-            fw.write("true\n".toCharArray());
-        }
-
-        final List<String> binds = new ArrayList<>();
-        binds.add(minionOverlay.toString() + ":/minion-docker-overlay");
-        binds.add(minionKarafLogs.toString() + ":/opt/minion/data/log");
-
-        final List<String> links = Lists.newArrayList();
-        links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
-        links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
-        links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
-
-        final Builder builder = HostConfig.builder()
-                .publishAllPorts(true)
-                .links(links)
-                .binds(binds);
-        spawnContainer(alias, builder);
     }
 
     private Path initializeOverlayRoot() {
@@ -648,18 +661,19 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     /**
      * Blocks until the Karaf Shell service is available.
      */
-    private void waitForMinion() throws Exception {
-        final ContainerAlias alias = ContainerAlias.MINION;
-        if (!isEnabled(alias)) {
-            return;
-        }
+    private void waitForMinions() throws Exception {
+        for (final ContainerAlias alias : Arrays.asList(ContainerAlias.MINION, ContainerAlias.MINION_SAME_LOCATION, ContainerAlias.MINION_OTHER_LOCATION)) {
+            if (!isEnabled(alias)) {
+                return;
+            }
 
-        final InetSocketAddress sshAddr = getServiceAddress(alias, 8201);
-        LOG.info("************************************************************");
-        LOG.info("Waiting for Minion @ {} to establish connectivity with OpenNMS instance.", sshAddr);
-        LOG.info("************************************************************");
-        await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> canMinionConnectToOpenNMS(sshAddr));
-        await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, true));
+            final InetSocketAddress sshAddr = getServiceAddress(alias, 8201);
+            LOG.info("************************************************************");
+            LOG.info("Waiting for Minion @ {} to establish connectivity with OpenNMS instance.", sshAddr);
+            LOG.info("************************************************************");
+            await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> canMinionConnectToOpenNMS(sshAddr));
+            await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, true));
+        }
     }
 
     public boolean canMinionConnectToOpenNMS(InetSocketAddress sshAddr) {

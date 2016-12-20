@@ -142,6 +142,10 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
+    public TestEnvironmentBuilder allWithAdditionalMinions() {
+        return all().minionWithSameLocation().minionWithOtherLocation();
+    }
+
     public TestEnvironmentBuilder postgres() {
         if (m_containers.contains(ContainerAlias.POSTGRES)) {
             return this;
@@ -175,6 +179,20 @@ public class TestEnvironmentBuilder {
             return this;
         }
         m_containers.add(ContainerAlias.MINION);
+        return this;
+    }
+    public TestEnvironmentBuilder minionWithSameLocation() {
+        if (m_containers.contains(ContainerAlias.MINION_SAME_LOCATION)) {
+            return this;
+        }
+        m_containers.add(ContainerAlias.MINION_SAME_LOCATION);
+        return this;
+    }
+    public TestEnvironmentBuilder minionWithOtherLocation() {
+        if (m_containers.contains(ContainerAlias.MINION_OTHER_LOCATION)) {
+            return this;
+        }
+        m_containers.add(ContainerAlias.MINION_OTHER_LOCATION);
         return this;
     }
 
