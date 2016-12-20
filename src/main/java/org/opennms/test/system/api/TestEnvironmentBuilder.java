@@ -135,13 +135,15 @@ public class TestEnvironmentBuilder {
 
     public TestEnvironmentBuilder all() {
         opennms();
-        minion1();
-        minion2();
-        minion3();
+        minion();
         snmpd();
         tomcat();
 
         return this;
+    }
+
+    public TestEnvironmentBuilder allWithAdditionalMinions() {
+        return all().minionWithSameLocation().minionWithOtherLocation();
     }
 
     public TestEnvironmentBuilder postgres() {
@@ -172,25 +174,25 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
-    public TestEnvironmentBuilder minion1() {
-        if (m_containers.contains(ContainerAlias.MINION1)) {
+    public TestEnvironmentBuilder minion() {
+        if (m_containers.contains(ContainerAlias.MINION)) {
             return this;
         }
-        m_containers.add(ContainerAlias.MINION1);
+        m_containers.add(ContainerAlias.MINION);
         return this;
     }
-    public TestEnvironmentBuilder minion2() {
-        if (m_containers.contains(ContainerAlias.MINION2)) {
+    public TestEnvironmentBuilder minionWithSameLocation() {
+        if (m_containers.contains(ContainerAlias.MINION_SAME_LOCATION)) {
             return this;
         }
-        m_containers.add(ContainerAlias.MINION2);
+        m_containers.add(ContainerAlias.MINION_SAME_LOCATION);
         return this;
     }
-    public TestEnvironmentBuilder minion3() {
-        if (m_containers.contains(ContainerAlias.MINION3)) {
+    public TestEnvironmentBuilder minionWithOtherLocation() {
+        if (m_containers.contains(ContainerAlias.MINION_OTHER_LOCATION)) {
             return this;
         }
-        m_containers.add(ContainerAlias.MINION3);
+        m_containers.add(ContainerAlias.MINION_OTHER_LOCATION);
         return this;
     }
 
