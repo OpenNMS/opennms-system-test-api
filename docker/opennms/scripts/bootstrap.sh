@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 OPENNMS_HOME=/opt/opennms
 
 echo "OPENNMS HOME: "${OPENNMS_HOME}
@@ -6,6 +6,18 @@ echo "OPENNMS HOME: "${OPENNMS_HOME}
 # Point PostgreSQL to the linked container
 sed -i 's|url=.*opennms.*|url="jdbc:postgresql://'"${POSTGRES_PORT_5432_TCP_ADDR}:${POSTGRES_PORT_5432_TCP_PORT}/opennms"'"|g' "${OPENNMS_HOME}/etc/opennms-datasources.xml"
 sed -i 's|url=.*template1.*|url="jdbc:postgresql://'"${POSTGRES_PORT_5432_TCP_ADDR}:${POSTGRES_PORT_5432_TCP_PORT}/template1"'"|g' "${OPENNMS_HOME}/etc/opennms-datasources.xml"
+
+# Point Elasticsearch to the linked container
+cat > ${OPENNMS_HOME}/etc/org.opennms.features.elasticsearch.eventforwarder.cfg <<EOF
+elasticsearchIp=${ELASTICSEARCH_PORT_9200_TCP_ADDR}
+elasticsearchHttpPort=${ELASTICSEARCH_PORT_9200_TCP_PORT}
+elasticsearchTransportPort=${ELASTICSEARCH_PORT_9300_TCP_PORT}
+EOF
+
+# Point Elasticsearch REST to the linked container
+cat > ${OPENNMS_HOME}/etc/org.opennms.plugin.elasticsearch.rest.forwarder.cfg <<EOF
+elasticsearchUrl=http://${ELASTICSEARCH_PORT_9200_TCP_ADDR}:${ELASTICSEARCH_PORT_9200_TCP_PORT}
+EOF
 
 # Expose the Karaf shell
 sed -i s/sshHost.*/sshHost=0.0.0.0/g "${OPENNMS_HOME}/etc/org.apache.karaf.shell.cfg"
