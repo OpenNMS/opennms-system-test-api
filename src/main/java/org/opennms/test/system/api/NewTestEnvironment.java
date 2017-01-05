@@ -48,8 +48,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,13 +82,17 @@ import com.spotify.docker.client.messages.PortBinding;
  * Spawns and configures a collection of Docker containers running the Minion TestEnvironment.
  *
  * In particular, this is composed of:
- *  1) postgres: An instance of PostgreSQL 
- *  2) opennms: An instance of OpenNMS
- *  3) minion: An instance of Minion
- *  3) minion: An instance of Minion
- *  4) snmpd: An instance of Net-SNMP (used to test SNMP support)
- *  5) tomcat: An instance of Tomcat (used to test JMX support)
- *  6) kafka: An optional instance of Apache Kafka to test Minion's Kafka support
+ * <ul>
+ *  <li>postgres: An instance of PostgreSQL</li> 
+ *  <li>opennms: An instance of OpenNMS</li>
+ *  <li>minion: An instance of Minion</li>
+ *  <li>snmpd: An instance of Net-SNMP (used to test SNMP support)</li>
+ *  <li>tomcat: An instance of Tomcat (used to test JMX support)</li>
+ *  <li>kafka: An optional instance of Apache Kafka to test Minion's Kafka support</li>
+ *  <li>elasticsearch1: An optional instance of Elasticsearch 1.X</li>
+ *  <li>elasticsearch2: An optional instance of Elasticsearch 2.X</li>
+ *  <li>elasticsearch5: An optional instance of Elasticsearch 5.X</li>
+ * </ul>
  *
  * @author jwhite
  */
@@ -100,13 +104,16 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      * Aliases used to refer to the containers within the tests
      * Note that these are not the container IDs or names
      */
-    public enum ContainerAlias {
-        POSTGRES,
+    public static enum ContainerAlias {
+        ELASTICSEARCH_1,
+        ELASTICSEARCH_2,
+        ELASTICSEARCH_5,
         KAFKA,
-        OPENNMS,
         MINION,
         MINION_SAME_LOCATION,
         MINION_OTHER_LOCATION,
+        OPENNMS,
+        POSTGRES,
         SNMPD,
         TOMCAT
     }
@@ -122,12 +129,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     public static final ImmutableMap<ContainerAlias, String> IMAGES_BY_ALIAS =
             new ImmutableMap.Builder<ContainerAlias, String>()
-            .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
+            .put(ContainerAlias.ELASTICSEARCH_1, "elasticsearch:1-alpine")
+            .put(ContainerAlias.ELASTICSEARCH_2, "elasticsearch:2-alpine")
+            .put(ContainerAlias.ELASTICSEARCH_5, "elasticsearch:5-alpine")
             .put(ContainerAlias.KAFKA, "spotify/kafka@sha256:cf8f8f760b48a07fb99df24fab8201ec8b647634751e842b67103a25a388981b")
-            .put(ContainerAlias.OPENNMS, "stests/opennms")
             .put(ContainerAlias.MINION, "stests/minion")
             .put(ContainerAlias.MINION_SAME_LOCATION, "stests/minion")
             .put(ContainerAlias.MINION_OTHER_LOCATION, "stests/minion")
+            .put(ContainerAlias.OPENNMS, "stests/opennms")
+            .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
             .put(ContainerAlias.SNMPD, "stests/snmpd")
             .put(ContainerAlias.TOMCAT, "stests/tomcat")
             .build();
@@ -187,6 +197,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         docker = DefaultDockerClient.fromEnv().build();
 
         spawnKafka();
+        spawnElasticsearch1();
+        spawnElasticsearch2();
+        spawnElasticsearch5();
 
         spawnPostgres();
         waitForPostgres();
@@ -352,6 +365,33 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnContainer(alias, builder, Collections.emptyList());
     }
 
+    private void spawnElasticsearch1() throws DockerException, InterruptedException, IOException {
+        spawnElasticsearch(ContainerAlias.ELASTICSEARCH_1);
+    }
+
+    private void spawnElasticsearch2() throws DockerException, InterruptedException, IOException {
+        spawnElasticsearch(ContainerAlias.ELASTICSEARCH_2);
+    }
+
+    private void spawnElasticsearch5() throws DockerException, InterruptedException, IOException {
+        spawnElasticsearch(ContainerAlias.ELASTICSEARCH_5);
+    }
+
+    /**
+     * Spawns an Elasticsearch container.
+     */
+    private void spawnElasticsearch(ContainerAlias alias) throws DockerException, InterruptedException, IOException {
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
+        }
+
+        LOG.debug("Starting Elasticsearch");
+
+        final Builder builder = HostConfig.builder()
+                .publishAllPorts(true);
+        spawnContainer(alias, builder);
+    }
+
     /**
      * Spawns the Apache Kafka container.
      */
@@ -420,10 +460,22 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         binds.add(opennmsLogs.toString() + ":/var/log/opennms");
         binds.add(opennmsKarafLogs.toString() + ":/opt/opennms/data/log");
 
-        final Builder builder = HostConfig.builder()
+        final List<String> links = new ArrayList<>();
+        links.add(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
+
+        // Link to the Elasticsearch container, if enabled
+        if (isEnabled(ContainerAlias.ELASTICSEARCH_1)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_1).name()));
+        } else if (isEnabled(ContainerAlias.ELASTICSEARCH_2)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_2).name()));
+        } else if (isEnabled(ContainerAlias.ELASTICSEARCH_5)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_5).name()));
+        }
+
+        Builder builder = HostConfig.builder()
                 .privileged(true)
                 .publishAllPorts(true)
-                .links(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()))
+                .links(links)
                 .binds(binds);
 
         spawnContainer(alias, builder, Collections.emptyList());

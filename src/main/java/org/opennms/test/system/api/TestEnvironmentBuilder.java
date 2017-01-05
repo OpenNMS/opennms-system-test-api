@@ -164,6 +164,33 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
+    public TestEnvironmentBuilder es1() {
+        if (m_containers.contains(ContainerAlias.ELASTICSEARCH_1)) {
+            return this;
+        }
+
+        m_containers.add(ContainerAlias.ELASTICSEARCH_1);
+        return this;
+    }
+
+    public TestEnvironmentBuilder es2() {
+        if (m_containers.contains(ContainerAlias.ELASTICSEARCH_2)) {
+            return this;
+        }
+
+        m_containers.add(ContainerAlias.ELASTICSEARCH_2);
+        return this;
+    }
+
+    public TestEnvironmentBuilder es5() {
+        if (m_containers.contains(ContainerAlias.ELASTICSEARCH_5)) {
+            return this;
+        }
+
+        m_containers.add(ContainerAlias.ELASTICSEARCH_5);
+        return this;
+    }
+
     public TestEnvironmentBuilder opennms() {
         if (m_containers.contains(ContainerAlias.OPENNMS)) {
             return this;
