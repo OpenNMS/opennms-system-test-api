@@ -118,10 +118,18 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         TOMCAT
     }
 
+    @SuppressWarnings("serial")
     public static final EnumMap<ContainerAlias, String> MINION_LOCATIONS = new EnumMap<ContainerAlias, String>(ContainerAlias.class) {{
         this.put(ContainerAlias.MINION, "MINION");
         this.put(ContainerAlias.MINION_SAME_LOCATION, "MINION");
         this.put(ContainerAlias.MINION_OTHER_LOCATION, "BANANA");
+    }};
+
+    @SuppressWarnings("serial")
+    public static final EnumMap<ContainerAlias, String> MINION_IDS = new EnumMap<ContainerAlias, String>(ContainerAlias.class) {{
+        this.put(ContainerAlias.MINION, "00000000-0000-0000-0000-000000ddba11");
+        this.put(ContainerAlias.MINION_SAME_LOCATION, "00000000-0000-0000-0000-000000ddba22");
+        this.put(ContainerAlias.MINION_OTHER_LOCATION, "00000000-0000-0000-0000-000000ddba33");
     }};
 
     /**
@@ -511,7 +519,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private void spawnMinions() throws DockerException, InterruptedException, IOException {
         for (final ContainerAlias alias : Arrays.asList(ContainerAlias.MINION, ContainerAlias.MINION_SAME_LOCATION, ContainerAlias.MINION_OTHER_LOCATION)) {
             if (!(isEnabled(alias) && isSpawned(alias))) {
-                return;
+                continue;
             }
 
             final Path overlayRoot = initializeOverlayRoot();
@@ -538,7 +546,12 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                                               .publishAllPorts(true)
                                               .links(links)
                                               .binds(binds);
-            spawnContainer(alias, builder, Collections.singletonList("MINION_LOCATION=" + MINION_LOCATIONS.get(alias)));
+
+            final List<String> env = Arrays.asList(
+                "MINION_LOCATION=" + MINION_LOCATIONS.get(alias),
+                "MINION_ID=" + MINION_IDS.get(alias)
+            );
+            spawnContainer(alias, builder, env);
         }
     }
 
