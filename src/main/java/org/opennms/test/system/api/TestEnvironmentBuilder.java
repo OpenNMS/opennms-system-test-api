@@ -21,19 +21,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TestEnvironmentBuilder {
-    public static class OpenNMSEnvironmentBuilder {
-        private boolean m_optIn = false; // opt-out by default; user can specify explicitly by calling .optIn(boolean)
-        private Path m_opennmsOverlay;
 
-        public OpenNMSEnvironmentBuilder() {
-        }
+    public static class EnvironmentBuilder {
+        private static final String TEMP_DIR_PREFIX = "container-overlay";
 
-        public OpenNMSEnvironmentBuilder optIn(final boolean optIn) {
-            m_optIn = optIn;
-            return this;
-        }
+        private Path m_overlay;
 
-        public OpenNMSEnvironmentBuilder addFiles(final Path directory, final String targetDirectory) {
+        public EnvironmentBuilder addFiles(final Path directory, final String targetDirectory) {
             if (directory == null || !directory.toFile().isDirectory()) {
                 throw new RuntimeException("You must specify a source directory!");
             }
@@ -61,7 +55,7 @@ public class TestEnvironmentBuilder {
             return this;
         }
 
-        public OpenNMSEnvironmentBuilder addFile(final String contents, final String target) {
+        public EnvironmentBuilder addFile(final String contents, final String target) {
             final File targetFile = createFile(target);
             try (final Writer w = new FileWriter(targetFile)) {
                 w.write(contents);
@@ -71,7 +65,7 @@ public class TestEnvironmentBuilder {
             return this;
         }
 
-        public OpenNMSEnvironmentBuilder addFile(final URL source, final String target) {
+        public EnvironmentBuilder addFile(final URL source, final String target) {
             final File targetFile = createFile(target);
             try (final InputStream is = source.openStream(); final OutputStream os = new FileOutputStream(targetFile)) {
                 IOUtils.copy(is, os);
@@ -82,6 +76,54 @@ public class TestEnvironmentBuilder {
         }
 
         public Path build() {
+            return m_overlay;
+        }
+
+        protected File createFile(final String path) {
+            if (m_overlay == null) {
+                try {
+                    m_overlay = Files.createTempDirectory(TEMP_DIR_PREFIX).toAbsolutePath();
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to create " + TEMP_DIR_PREFIX + " temporary directory!");
+                }
+            }
+
+            final Path filePath = m_overlay.resolve(path);
+            filePath.getParent().toFile().mkdirs();
+            final File file = filePath.toFile();
+            return file;
+        }
+    }
+
+    public static class OpenNMSEnvironmentBuilder extends EnvironmentBuilder {
+
+        private boolean m_optIn = false; // opt-out by default; user can specify explicitly by calling .optIn(boolean)
+
+        public OpenNMSEnvironmentBuilder optIn(final boolean optIn) {
+            m_optIn = optIn;
+            return this;
+        }
+
+        @Override
+        public OpenNMSEnvironmentBuilder addFiles(final Path directory, final String targetDirectory) {
+            super.addFiles(directory, targetDirectory);
+            return this;
+        }
+
+        @Override
+        public OpenNMSEnvironmentBuilder addFile(final String contents, final String target) {
+            super.addFile(contents, target);
+            return this;
+        }
+
+        @Override
+        public OpenNMSEnvironmentBuilder addFile(final URL source, final String target) {
+            super.addFile(source, target);
+            return this;
+        }
+
+        @Override
+        public Path build() {
             final File datachoices = createFile("etc/org.opennms.features.datachoices.cfg");
             try (final Writer w = new FileWriter(datachoices)) {
                 w.write("enabled=" + m_optIn + "\n" +
@@ -91,23 +133,9 @@ public class TestEnvironmentBuilder {
                 throw new RuntimeException("Failed to create opt-in enabled="+m_optIn+" file in $OPENNMS_HOME/etc!", e);
             }
 
-            return m_opennmsOverlay;
+            return super.build();
         }
 
-        protected File createFile(final String path) {
-            if (m_opennmsOverlay == null) {
-                try {
-                    m_opennmsOverlay = Files.createTempDirectory("opennms-overlay").toAbsolutePath();
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to create opennms-overlay temporary directory!");
-                }
-            }
-
-            final Path filePath = m_opennmsOverlay.resolve(path);
-            filePath.getParent().toFile().mkdirs();
-            final File file = filePath.toFile();
-            return file;
-        }
     }
 
     private static Logger LOG = LoggerFactory.getLogger(TestEnvironmentBuilder.class);
@@ -119,6 +147,8 @@ public class TestEnvironmentBuilder {
     private Set<ContainerAlias> m_containers = new LinkedHashSet<>();
 
     private OpenNMSEnvironmentBuilder m_opennmsEnvironmentBuilder;
+
+    private EnvironmentBuilder m_minionEnvironmentBuilder;
 
     public TestEnvironmentBuilder() {
     }
@@ -248,18 +278,26 @@ public class TestEnvironmentBuilder {
         return m_opennmsEnvironmentBuilder;
     }
 
+    public EnvironmentBuilder withMinionEnvironment() {
+        if (m_minionEnvironmentBuilder == null) {
+            m_minionEnvironmentBuilder = new EnvironmentBuilder();
+        }
+        return m_minionEnvironmentBuilder;
+    }
+
     public TestEnvironment build() {
         if (m_containers.size() == 0) {
             all();
         }
 
-        final Path opennmsOverlay = m_opennmsEnvironmentBuilder == null? null : m_opennmsEnvironmentBuilder.build();
-
         LOG.debug("Creating environment with containers: {}", m_containers);
         if (m_useExisting) {
             return new ExistingTestEnvironment();
         } else {
-            return new NewTestEnvironment(m_name, m_skipTearDown, opennmsOverlay, m_containers);
+            final Path opennmsOverlay = (m_opennmsEnvironmentBuilder == null ? null : m_opennmsEnvironmentBuilder.build());
+            final Path minionOverlay = (m_minionEnvironmentBuilder == null ? null : m_minionEnvironmentBuilder.build());
+
+            return new NewTestEnvironment(m_name, m_skipTearDown, opennmsOverlay, minionOverlay, m_containers);
         }
     }
 }
