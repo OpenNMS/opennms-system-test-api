@@ -132,6 +132,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         this.put(ContainerAlias.MINION_OTHER_LOCATION, "00000000-0000-0000-0000-000000ddba33");
     }};
 
+    public static final EnumMap<ContainerAlias, Boolean> INITIALIZED_OVERLAYS = new EnumMap<>(ContainerAlias.class);
+
     /**
      * Mapping from the alias to the Docker image name
      */
@@ -162,9 +164,14 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private final boolean skipTearDown;
 
     /**
-     * The location of the files to be overlayed into /opt/opennms.
+     * The location of the files to be overlaid into /opt/opennms.
      */
     private Path overlayDirectory;
+
+    /**
+     * The location of the files to be overlaid into /opt/minion.
+     */
+    private Path minionOverlayDirectory;
 
     /**
      * A collection of containers that should be started by default
@@ -187,11 +194,10 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     private DockerClient docker;
 
-    private boolean m_overlayRootInitialized = false;
-
-    public NewTestEnvironment(final String name, final boolean skipTearDown, final Path overlayDirectory, final Collection<ContainerAlias> containers) {
+    public NewTestEnvironment(final String name, final boolean skipTearDown, final Path overlayDirectory, final Path minionOverlayDirectory, final Collection<ContainerAlias> containers) {
         this.skipTearDown = skipTearDown;
         this.overlayDirectory = overlayDirectory;
+        this.minionOverlayDirectory = minionOverlayDirectory;
         this.start = containers;
         this.name = name;
     }
@@ -437,7 +443,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
-        final Path overlayRoot = initializeOverlayRoot();
+        final Path overlayRoot = initializeOverlayRoot(alias);
 
         final Path opennmsOverlay = overlayRoot.resolve("opennms-overlay");
         final Path opennmsLogs = overlayRoot.resolve("opennms-logs");
@@ -478,6 +484,10 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_2).name()));
         } else if (isEnabled(ContainerAlias.ELASTICSEARCH_5)) {
             links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_5).name()));
+        }
+
+        if (isEnabled(ContainerAlias.KAFKA)) {
+            links.add(String.format("%s:kafka", containerInfoByAlias.get(ContainerAlias.KAFKA).name()));
         }
 
         Builder builder = HostConfig.builder()
@@ -522,15 +532,32 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 continue;
             }
 
-            final Path overlayRoot = initializeOverlayRoot();
+            final Path overlayRoot = initializeOverlayRoot(alias);
 
             final Path minionOverlay = overlayRoot.resolve("minion-overlay");
             final Path minionKarafLogs = overlayRoot.resolve("minion-karaf-logs");
+
             Files.createDirectories(minionOverlay.resolve("etc"));
             Files.createDirectories(minionKarafLogs);
 
             try (final FileWriter fw = new FileWriter(minionOverlay.resolve("etc/clean.disabled").toFile())) {
                 fw.write("true\n".toCharArray());
+            }
+
+            if (this.minionOverlayDirectory != null) {
+                Files.find(this.minionOverlayDirectory, 10, (path, attr) -> {
+                    return path.toFile().isFile();
+                }).forEach(path -> {
+                    final Path relative = Paths.get(this.minionOverlayDirectory.toFile().toURI().relativize(path.toFile().toURI()).getPath());
+                    final Path to = Paths.get(minionOverlay.toString(), relative.toString());
+                    LOG.debug("Copying {} to {}", path.toAbsolutePath(), to.toAbsolutePath());
+                    try {
+                        Files.createDirectories(to.getParent());
+                        Files.copy(path.toAbsolutePath(), to.toAbsolutePath());
+                    } catch (final Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
             }
 
             final List<String> binds = new ArrayList<>();
@@ -541,6 +568,10 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
             links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
             links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
+
+            if (isEnabled(ContainerAlias.KAFKA)) {
+                links.add(String.format("%s:kafka", containerInfoByAlias.get(ContainerAlias.KAFKA).name()));
+            }
 
             final Builder builder = HostConfig.builder()
                                               .publishAllPorts(true)
@@ -555,12 +586,12 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
     }
 
-    private Path initializeOverlayRoot() {
-        final Path overlayRoot = Paths.get("target", "overlays", getName()).toAbsolutePath();
-        if (!m_overlayRootInitialized && overlayRoot.toFile().exists()) {
+    private Path initializeOverlayRoot(ContainerAlias alias) {
+        final Path overlayRoot = Paths.get("target", "overlays", getName(), alias.toString()).toAbsolutePath();
+        if (INITIALIZED_OVERLAYS.get(alias) != null && !INITIALIZED_OVERLAYS.get(alias) && overlayRoot.toFile().exists()) {
             FileUtils.removeDir(overlayRoot.toFile());
         }
-        m_overlayRootInitialized = true;
+        INITIALIZED_OVERLAYS.put(alias, true);
         return overlayRoot;
     }
 

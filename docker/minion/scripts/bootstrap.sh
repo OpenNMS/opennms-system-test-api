@@ -15,6 +15,12 @@ echo "id = ${MINION_ID:=00000000-0000-0000-0000-000000ddba11}" >> $MINION_HOME/e
 echo "http-url = http://${OPENNMS_PORT_8980_TCP_ADDR}:${OPENNMS_PORT_8980_TCP_PORT}" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg
 echo "broker-url = failover:tcp://${OPENNMS_PORT_61616_TCP_ADDR}:${OPENNMS_PORT_61616_TCP_PORT}" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg
 
+# Point the Apache Kafka sink to the linked container
+cat > ${MINION_HOME}/etc/org.opennms.core.ipc.sink.kafka.cfg <<EOF
+bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
+acks=1
+EOF
+
 echo "Overlaying files from /minion-docker-overlay/ onto ${MINION_HOME}"
 find /minion-docker-overlay -ls
 rsync -ar /minion-docker-overlay/ "${MINION_HOME}"/
