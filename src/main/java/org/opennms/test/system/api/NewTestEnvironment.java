@@ -586,13 +586,19 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
     }
 
-    private Path initializeOverlayRoot(ContainerAlias alias) {
+    private Path initializeOverlayRoot(final ContainerAlias alias) {
         final Path overlayRoot = Paths.get("target", "overlays", getName(), alias.toString()).toAbsolutePath();
-        if (INITIALIZED_OVERLAYS.get(alias) != null && !INITIALIZED_OVERLAYS.get(alias) && overlayRoot.toFile().exists()) {
+
+        if (!isInitialized(alias)) {
             FileUtils.removeDir(overlayRoot.toFile());
         }
+
         INITIALIZED_OVERLAYS.put(alias, true);
         return overlayRoot;
+    }
+
+    private boolean isInitialized(final ContainerAlias alias) {
+        return INITIALIZED_OVERLAYS.containsKey(alias) && INITIALIZED_OVERLAYS.get(alias);
     }
 
     private boolean isEnabled(final ContainerAlias alias) {
