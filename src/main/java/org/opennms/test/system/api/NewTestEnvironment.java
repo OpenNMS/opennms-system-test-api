@@ -44,6 +44,7 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -462,7 +463,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 LOG.debug("Copying {} to {}", path.toAbsolutePath(), to.toAbsolutePath());
                 try {
                     Files.createDirectories(to.getParent());
-                    Files.copy(path.toAbsolutePath(), to.toAbsolutePath());
+                    Files.copy(path.toAbsolutePath(), to.toAbsolutePath(), StandardCopyOption.REPLACE_EXISTING);
                 } catch (final Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -553,7 +554,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                     LOG.debug("Copying {} to {}", path.toAbsolutePath(), to.toAbsolutePath());
                     try {
                         Files.createDirectories(to.getParent());
-                        Files.copy(path.toAbsolutePath(), to.toAbsolutePath());
+                        Files.deleteIfExists(to.toAbsolutePath());
+                        Files.copy(path.toAbsolutePath(), to.toAbsolutePath(), StandardCopyOption.REPLACE_EXISTING);
                     } catch (final Exception e) {
                         throw new RuntimeException(e);
                     }
