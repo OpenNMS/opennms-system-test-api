@@ -7,6 +7,12 @@ echo "OPENNMS HOME: "${OPENNMS_HOME}
 sed -i 's|url=.*opennms.*|url="jdbc:postgresql://'"${POSTGRES_PORT_5432_TCP_ADDR}:${POSTGRES_PORT_5432_TCP_PORT}/opennms"'"|g' "${OPENNMS_HOME}/etc/opennms-datasources.xml"
 sed -i 's|url=.*template1.*|url="jdbc:postgresql://'"${POSTGRES_PORT_5432_TCP_ADDR}:${POSTGRES_PORT_5432_TCP_PORT}/template1"'"|g' "${OPENNMS_HOME}/etc/opennms-datasources.xml"
 
+# Point Apache Cassandra to the linked container
+cat > ${OPENNMS_HOME}/etc/opennms.properties.d/cassandra-server.properties <<EOF
+org.opennms.newts.config.hostname=${CASSANDRA_PORT_9042_TCP_ADDR}
+org.opennms.newts.config.port=${CASSANDRA_PORT_9042_TCP_PORT}
+EOF
+
 # Point Elasticsearch to the linked container
 cat > ${OPENNMS_HOME}/etc/org.opennms.features.elasticsearch.eventforwarder.cfg <<EOF
 elasticsearchIp=${ELASTICSEARCH_PORT_9200_TCP_ADDR}

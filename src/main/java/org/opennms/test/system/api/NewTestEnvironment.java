@@ -89,6 +89,7 @@ import com.spotify.docker.client.messages.PortBinding;
  *  <li>minion: An instance of Minion</li>
  *  <li>snmpd: An instance of Net-SNMP (used to test SNMP support)</li>
  *  <li>tomcat: An instance of Tomcat (used to test JMX support)</li>
+ *  <li>cassandra: An optional instance of Apache Cassandra</li>
  *  <li>kafka: An optional instance of Apache Kafka to test Minion's Kafka support</li>
  *  <li>elasticsearch1: An optional instance of Elasticsearch 1.X</li>
  *  <li>elasticsearch2: An optional instance of Elasticsearch 2.X</li>
@@ -106,6 +107,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      * Note that these are not the container IDs or names
      */
     public static enum ContainerAlias {
+        CASSANDRA,
         ELASTICSEARCH_1,
         ELASTICSEARCH_2,
         ELASTICSEARCH_5,
@@ -140,6 +142,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     public static final ImmutableMap<ContainerAlias, String> IMAGES_BY_ALIAS =
             new ImmutableMap.Builder<ContainerAlias, String>()
+            .put(ContainerAlias.CASSANDRA, "cassandra:3")
             .put(ContainerAlias.ELASTICSEARCH_1, "elasticsearch:1-alpine")
             .put(ContainerAlias.ELASTICSEARCH_2, "elasticsearch:2-alpine")
             .put(ContainerAlias.ELASTICSEARCH_5, "elasticsearch:5-alpine")
@@ -211,10 +214,12 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     protected void before() throws Throwable {
         docker = DefaultDockerClient.fromEnv().build();
 
-        spawnKafka();
+        // Optionally spawn clustered services
+        spawnCassandra();
         spawnElasticsearch1();
         spawnElasticsearch2();
         spawnElasticsearch5();
+        spawnKafka();
 
         spawnPostgres();
         waitForPostgres();
@@ -377,7 +382,23 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         final Builder builder = HostConfig.builder()
                 .publishAllPorts(true);
-        spawnContainer(alias, builder, Collections.emptyList());
+        spawnContainer(alias, builder);
+    }
+
+    /**
+     * Spawns the Apache Cassandra container.
+     */
+    private void spawnCassandra() throws DockerException, InterruptedException, IOException {
+        final ContainerAlias alias = ContainerAlias.CASSANDRA;
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
+        }
+
+        LOG.debug("Starting Cassandra");
+
+        final Builder builder = HostConfig.builder()
+                .publishAllPorts(true);
+        spawnContainer(alias, builder);
     }
 
     private void spawnElasticsearch1() throws DockerException, InterruptedException, IOException {
