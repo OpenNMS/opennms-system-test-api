@@ -11,6 +11,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -141,8 +142,8 @@ public class TestEnvironmentBuilder {
     private static Logger LOG = LoggerFactory.getLogger(TestEnvironmentBuilder.class);
 
     private String m_name = null;
-    private boolean m_skipTearDown = false;
-    private boolean m_useExisting = false;
+
+    EnumMap<TestEnvironmentProperty,Object> properties = new EnumMap<>(TestEnvironmentProperty.class);
 
     private Set<ContainerAlias> m_containers = new LinkedHashSet<>();
 
@@ -154,12 +155,12 @@ public class TestEnvironmentBuilder {
     }
 
     public TestEnvironmentBuilder skipTearDown(boolean skipTearDown) {
-        m_skipTearDown = skipTearDown;
+        properties.put(TestEnvironmentProperty.SKIP_TEAR_DOWN, skipTearDown);
         return this;
     }
 
     public TestEnvironmentBuilder useExisting(boolean useExisting) {
-        m_useExisting = useExisting;
+        properties.put(TestEnvironmentProperty.USE_EXISTING, useExisting);
         return this;
     }
 
@@ -191,15 +192,6 @@ public class TestEnvironmentBuilder {
         }
 
         m_containers.add(ContainerAlias.KAFKA);
-        return this;
-    }
-
-    public TestEnvironmentBuilder es1() {
-        if (m_containers.contains(ContainerAlias.ELASTICSEARCH_1)) {
-            return this;
-        }
-
-        m_containers.add(ContainerAlias.ELASTICSEARCH_1);
         return this;
     }
 
@@ -291,13 +283,13 @@ public class TestEnvironmentBuilder {
         }
 
         LOG.debug("Creating environment with containers: {}", m_containers);
-        if (m_useExisting) {
+        if ((Boolean)properties.get(TestEnvironmentProperty.USE_EXISTING)) {
             return new ExistingTestEnvironment();
         } else {
             final Path opennmsOverlay = (m_opennmsEnvironmentBuilder == null ? null : m_opennmsEnvironmentBuilder.build());
             final Path minionOverlay = (m_minionEnvironmentBuilder == null ? null : m_minionEnvironmentBuilder.build());
 
-            return new NewTestEnvironment(m_name, m_skipTearDown, opennmsOverlay, minionOverlay, m_containers);
+            return new NewTestEnvironment(m_name, properties, opennmsOverlay, minionOverlay, m_containers);
         }
     }
 }

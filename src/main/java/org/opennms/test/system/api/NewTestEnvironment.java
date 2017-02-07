@@ -90,7 +90,6 @@ import com.spotify.docker.client.messages.PortBinding;
  *  <li>snmpd: An instance of Net-SNMP (used to test SNMP support)</li>
  *  <li>tomcat: An instance of Tomcat (used to test JMX support)</li>
  *  <li>kafka: An optional instance of Apache Kafka to test Minion's Kafka support</li>
- *  <li>elasticsearch1: An optional instance of Elasticsearch 1.X</li>
  *  <li>elasticsearch2: An optional instance of Elasticsearch 2.X</li>
  *  <li>elasticsearch5: An optional instance of Elasticsearch 5.X</li>
  * </ul>
@@ -106,7 +105,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      * Note that these are not the container IDs or names
      */
     public static enum ContainerAlias {
-        ELASTICSEARCH_1,
         ELASTICSEARCH_2,
         ELASTICSEARCH_5,
         KAFKA,
@@ -140,7 +138,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     public static final ImmutableMap<ContainerAlias, String> IMAGES_BY_ALIAS =
             new ImmutableMap.Builder<ContainerAlias, String>()
-            .put(ContainerAlias.ELASTICSEARCH_1, "elasticsearch:1-alpine")
             .put(ContainerAlias.ELASTICSEARCH_2, "elasticsearch:2-alpine")
             .put(ContainerAlias.ELASTICSEARCH_5, "elasticsearch:5-alpine")
             .put(ContainerAlias.KAFKA, "spotify/kafka@sha256:cf8f8f760b48a07fb99df24fab8201ec8b647634751e842b67103a25a388981b")
@@ -159,10 +156,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private final String name;
 
     /**
-     * Set if the containers should be kept running after the tests complete
-     * (regardless of whether or not they were successful)
+     * Environment properties.
      */
-    private final boolean skipTearDown;
+    private final EnumMap<TestEnvironmentProperty,Object> properties;
 
     /**
      * The location of the files to be overlaid into /opt/opennms.
@@ -195,8 +191,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     private DockerClient docker;
 
-    public NewTestEnvironment(final String name, final boolean skipTearDown, final Path overlayDirectory, final Path minionOverlayDirectory, final Collection<ContainerAlias> containers) {
-        this.skipTearDown = skipTearDown;
+    public NewTestEnvironment(final String name, final EnumMap<TestEnvironmentProperty,Object> properties, final Path overlayDirectory, final Path minionOverlayDirectory, final Collection<ContainerAlias> containers) {
+        this.properties = properties;
         this.overlayDirectory = overlayDirectory;
         this.minionOverlayDirectory = minionOverlayDirectory;
         this.start = containers;
@@ -212,7 +208,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         docker = DefaultDockerClient.fromEnv().build();
 
         spawnKafka();
-        spawnElasticsearch1();
         spawnElasticsearch2();
         spawnElasticsearch5();
 
@@ -320,7 +315,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             }
         }
 
-        if (!skipTearDown) {
+        if (!(Boolean)properties.getOrDefault(TestEnvironmentProperty.SKIP_TEAR_DOWN, Boolean.FALSE)) {
             // Kill and remove all of the containers we created
             for (String containerId : createdContainerIds) {
                 try {
@@ -380,10 +375,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnContainer(alias, builder, Collections.emptyList());
     }
 
-    private void spawnElasticsearch1() throws DockerException, InterruptedException, IOException {
-        spawnElasticsearch(ContainerAlias.ELASTICSEARCH_1);
-    }
-
     private void spawnElasticsearch2() throws DockerException, InterruptedException, IOException {
         spawnElasticsearch(ContainerAlias.ELASTICSEARCH_2);
     }
@@ -427,7 +418,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         // Advertise Kafka on the Docker host address
         List<String> env = Arrays.asList(new String[] {
             "ADVERTISED_HOST=" + InetAddress.getLocalHost().getHostAddress(),
-            "ADVERTISED_PORT=" + portBindings.get("9092").get(0).hostPort()
+            "ADVERTISED_PORT=" + portBindings.get("9092").get(0).hostPort(),
+            "NUM_PARTITIONS=" + properties.getOrDefault(TestEnvironmentProperty.KAFKA_PARTITIONS, 10)
         });
 
         final Builder builder = HostConfig.builder()
@@ -479,9 +471,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         links.add(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
 
         // Link to the Elasticsearch container, if enabled
-        if (isEnabled(ContainerAlias.ELASTICSEARCH_1)) {
-            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_1).name()));
-        } else if (isEnabled(ContainerAlias.ELASTICSEARCH_2)) {
+        if (isEnabled(ContainerAlias.ELASTICSEARCH_2)) {
             links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_2).name()));
         } else if (isEnabled(ContainerAlias.ELASTICSEARCH_5)) {
             links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_5).name()));
