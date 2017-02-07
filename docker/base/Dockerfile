@@ -7,9 +7,6 @@ RUN rpm --import https://yum.opennms.org/OPENNMS-GPG-KEY
 # Make sure we have the EPEL repository available
 RUN yum install -y epel-release deltarpm http://yum.opennms.org/repofiles/opennms-repo-develop-rhel7.noarch.rpm
 
-# bring the container up-to-date
-RUN yum -y upgrade && yum -y clean all
-
 RUN yum -y install  \
 	ed \
 	java-1.8.0-openjdk-devel \
