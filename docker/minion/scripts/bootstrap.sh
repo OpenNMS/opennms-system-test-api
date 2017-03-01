@@ -12,7 +12,7 @@ sed -i s/rmiServerHost.*/rmiServerHost=0.0.0.0/g "${MINION_HOME}/etc/org.apache.
 
 echo "location = ${MINION_LOCATION:=MINION}" > $MINION_HOME/etc/org.opennms.minion.controller.cfg
 echo "id = ${MINION_ID:=00000000-0000-0000-0000-000000ddba11}" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg
-echo "http-url = http://${OPENNMS_PORT_8980_TCP_ADDR}:${OPENNMS_PORT_8980_TCP_PORT}" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg
+echo "http-url = http://${OPENNMS_PORT_8980_TCP_ADDR}:${OPENNMS_PORT_8980_TCP_PORT}/opennms" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg
 echo "broker-url = failover:tcp://${OPENNMS_PORT_61616_TCP_ADDR}:${OPENNMS_PORT_61616_TCP_PORT}" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg
 
 # Point the Apache Kafka sink to the linked container
