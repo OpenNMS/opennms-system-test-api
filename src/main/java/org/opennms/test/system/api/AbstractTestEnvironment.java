@@ -52,11 +52,16 @@ public abstract class AbstractTestEnvironment extends ExternalResourceRule imple
         if (info == null) {
             throw new IllegalArgumentException(String.format("No container found with alias: %s", alias));
         }
+        return getServiceAddress(info, port, type);
+    }
+
+    @Override
+    public InetSocketAddress getServiceAddress(ContainerInfo info, int port, String type) {
         final String portKey = port + "/" + type;
         final List<PortBinding> bindings = info.networkSettings().ports().get(portKey);
         if (bindings == null) {
             throw new IllegalArgumentException(String.format("No bindings found for port %s on alias: %s",
-                    portKey, alias));
+                    portKey, info.name()));
         }
         final PortBinding binding = bindings.iterator().next();
         final String host = "0.0.0.0".equals(binding.hostIp()) ? getDockerClient().getHost() : binding.hostIp();

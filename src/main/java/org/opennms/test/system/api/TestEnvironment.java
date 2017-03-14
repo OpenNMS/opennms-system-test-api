@@ -47,13 +47,15 @@ import com.spotify.docker.client.messages.ContainerInfo;
  */
 public interface TestEnvironment extends TestRule {
 
-    public InetSocketAddress getServiceAddress(ContainerAlias alias, int port);
+    InetSocketAddress getServiceAddress(ContainerAlias alias, int port);
 
-    public InetSocketAddress getServiceAddress(ContainerAlias alias, int port, String type);
+    InetSocketAddress getServiceAddress(ContainerAlias alias, int port, String type);
 
-    public ContainerInfo getContainerInfo(ContainerAlias alias);
+    InetSocketAddress getServiceAddress(ContainerInfo alias, int port, String type);
 
-    public Set<ContainerAlias> getContainerAliases();
+    ContainerInfo getContainerInfo(ContainerAlias alias);
+
+    Set<ContainerAlias> getContainerAliases();
 
     public static TestEnvironmentBuilder builder() {
         return new TestEnvironmentBuilder();
