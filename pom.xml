@@ -32,7 +32,7 @@
       <groupId>com.spotify</groupId>
       <artifactId>docker-client</artifactId>
       <classifier>shaded</classifier>
-      <version>6.0.0</version>
+      <version>8.1.1</version>
     </dependency>
     <dependency>
         <groupId>com.jcraft</groupId>
