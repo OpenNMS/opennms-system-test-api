@@ -393,9 +393,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         LOG.debug("Starting Elasticsearch");
 
+        // Randomize the cluster.name so that Elasticsearch instances don't cluster with each other during tests.
+        // Use the same method as org.opennms.core.test.db.TemporaryDatabasePostgreSQL.
+        List<String> env = Arrays.asList(new String[] {
+            String.format("cluster.name=opennms_test_%s_%06d_%s", System.currentTimeMillis(), System.nanoTime(), Math.abs(this.hashCode())),
+        });
+
         final Builder builder = HostConfig.builder()
                 .publishAllPorts(true);
-        spawnContainer(alias, builder);
+        spawnContainer(alias, builder, env);
     }
 
     /**
