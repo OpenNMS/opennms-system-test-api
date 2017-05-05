@@ -32,12 +32,15 @@ import java.util.List;
 
 import org.opennms.test.system.api.NewTestEnvironment.ContainerAlias;
 import org.opennms.test.system.api.junit.ExternalResourceRule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.spotify.docker.client.DockerClient;
 import com.spotify.docker.client.messages.ContainerInfo;
 import com.spotify.docker.client.messages.PortBinding;
 
 public abstract class AbstractTestEnvironment extends ExternalResourceRule implements TestEnvironment {
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractTestEnvironment.class);
 
     public abstract DockerClient getDockerClient();
 
@@ -48,6 +51,7 @@ public abstract class AbstractTestEnvironment extends ExternalResourceRule imple
 
     @Override
     public InetSocketAddress getServiceAddress(ContainerAlias alias, int port, String type) {
+        LOG.debug("Getting container info for alias {}", alias);
         final ContainerInfo info = getContainerInfo(alias);
         if (info == null) {
             throw new IllegalArgumentException(String.format("No container found with alias: %s", alias));
@@ -57,9 +61,10 @@ public abstract class AbstractTestEnvironment extends ExternalResourceRule imple
 
     @Override
     public InetSocketAddress getServiceAddress(ContainerInfo info, int port, String type) {
+        LOG.debug("Getting service address for container {}", info);
         final String portKey = port + "/" + type;
         final List<PortBinding> bindings = info.networkSettings().ports().get(portKey);
-        if (bindings == null) {
+        if (bindings == null || bindings.size() == 0) {
             throw new IllegalArgumentException(String.format("No bindings found for port %s on alias: %s",
                     portKey, info.name()));
         }

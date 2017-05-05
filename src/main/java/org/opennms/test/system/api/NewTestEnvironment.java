@@ -187,6 +187,11 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private final Map<ContainerAlias, ContainerInfo> containerInfoByAlias = Maps.newHashMap();
 
     /**
+     * Keep track of used ports
+     */
+    private final Map<ContainerAlias, Set<Integer>> ports = Maps.newConcurrentMap();
+
+    /**
      * The Docker daemon client
      */
     private DockerClient docker;
@@ -330,14 +335,52 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                     LOG.error("************************************************************");
                 }
             }
+
+            for (final ContainerAlias containerAlias : ports.keySet()) {
+                final Set<InetSocketAddress> realPorts = Sets.newHashSet();
+                if (ports.containsKey(containerAlias)) {
+                    for (final Integer port : ports.get(containerAlias)) {
+                        realPorts.add(getServiceAddress(containerAlias, port));
+                    }
+                }
+                for (final InetSocketAddress addr : realPorts) {
+                    waitForPortAvailable(containerAlias, addr);
+                }
+            }
+
             containerInfoByAlias.clear();
             createdContainerIds.clear();
+            ports.clear();
         } else {
             LOG.info("Skipping tear down.");
         }
 
         docker.close();
     };
+
+    private void waitForPortAvailable(final ContainerAlias alias, final InetSocketAddress addr) {
+        LOG.debug("{}({}): waiting for port to be available.", alias, addr);
+        if (checkSocket(alias, addr)) {
+            return;
+        }
+        await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(new Callable<Boolean>() {
+            @Override
+            public Boolean call() throws Exception {
+                return checkSocket(alias, addr);
+            }
+        }, is(Boolean.TRUE));
+    }
+
+    private Boolean checkSocket(final ContainerAlias alias, final InetSocketAddress addr) {
+        try (final Socket sock = new Socket()) {
+            sock.connect(addr, 50);
+        } catch (final Exception e) {
+            LOG.debug("{}({}): port is available!", alias, addr);
+            return true;
+        }
+        LOG.debug("{}({}): port is still active. :(", alias, addr);
+        return false;
+    }
 
     @Override
     public Set<ContainerAlias> getContainerAliases() {
@@ -352,7 +395,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     private ContainerAlias getContainerName(final String containerId) {
         for (final ContainerAlias alias : start) {
             final ContainerInfo info = containerInfoByAlias.get(alias);
-            if (containerId.equals(info.id())) {
+            if (info != null && containerId.equals(info.id())) {
                 return alias;
             }
         }
@@ -633,6 +676,14 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         LOG.info("************************************************************");
         if (!containerInfo.state().running()) {
             throw new IllegalStateException("Could not start the " + alias + " container");
+        }
+
+        if (hostConfig.portBindings() != null) {
+            final Set<Integer> containerPorts = Sets.newConcurrentHashSet();
+            hostConfig.portBindings().keySet().forEach(pb -> {
+                containerPorts.add(Integer.valueOf(pb));
+            });
+            ports.put(alias, containerPorts);
         }
 
         containerInfoByAlias.put(alias, containerInfo);
