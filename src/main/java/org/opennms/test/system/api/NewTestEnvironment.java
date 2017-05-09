@@ -321,17 +321,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
 
         if (!(Boolean)properties.getOrDefault(TestEnvironmentProperty.SKIP_TEAR_DOWN, Boolean.FALSE)) {
-            // Kill and remove all of the containers we created
-            for (String containerId : createdContainerIds) {
+            for (final String containerId : createdContainerIds) {
                 try {
                     LOG.info("************************************************************");
-                    LOG.info("Killing and removing container with id: {}", containerId);
+                    LOG.info("Killing container with id: {}", containerId);
                     LOG.info("************************************************************");
-                    docker.killContainer(containerId);
-                    docker.removeContainer(containerId);
-                } catch (Exception e) {
+                    docker.stopContainer(containerId, 5);
+                } catch (final Exception e) {
                     LOG.error("************************************************************");
-                    LOG.error("Failed to kill and/or remove container with id: {}", containerId, e);
+                    LOG.error("Failed to kill container with id: {}", containerId, e);
                     LOG.error("************************************************************");
                 }
             }
@@ -345,6 +343,19 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 }
                 for (final InetSocketAddress addr : realPorts) {
                     waitForPortAvailable(containerAlias, addr);
+                }
+            }
+
+            for (final String containerId : createdContainerIds) {
+                try {
+                    LOG.info("************************************************************");
+                    LOG.info("Removing container with id: {}", containerId);
+                    LOG.info("************************************************************");
+                    docker.removeContainer(containerId);
+                } catch (final Exception e) {
+                    LOG.error("************************************************************");
+                    LOG.error("Failed to remove container with id: {}", containerId, e);
+                    LOG.error("************************************************************");
                 }
             }
 
