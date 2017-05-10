@@ -55,6 +55,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.cxf.helpers.FileUtils;
@@ -71,6 +73,7 @@ import com.spotify.docker.client.DefaultDockerClient;
 import com.spotify.docker.client.DockerClient;
 import com.spotify.docker.client.DockerClient.LogsParam;
 import com.spotify.docker.client.LogStream;
+import com.spotify.docker.client.exceptions.ContainerNotFoundException;
 import com.spotify.docker.client.exceptions.DockerException;
 import com.spotify.docker.client.messages.ContainerConfig;
 import com.spotify.docker.client.messages.ContainerCreation;
@@ -179,7 +182,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      * Keeps track of the IDs for all the created containers so we can
      * (possibly) tear them down later
      */
-    private final Set<String> createdContainerIds = Sets.newHashSet();
+    private final Set<String> createdContainerIds = Sets.newLinkedHashSet();
 
     /**
      * Keep track of container meta-data
@@ -287,12 +290,16 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         } else {
             LOG.warn("No Minion container provisioned. Logs won't be copied.");
         }
-        */
+         */
+
+        /* process the containers in the reverse order of startup */
+        final List<String> containerIds = new ArrayList<>(createdContainerIds);
+        Collections.reverse(containerIds);
 
         LOG.info("************************************************************");
         LOG.info("Gathering container output...");
         LOG.info("************************************************************");
-        for (final String containerId : createdContainerIds) {
+        for (final String containerId : containerIds) {
             try {
                 LogStream logStream = docker.logs(containerId, LogsParam.stdout(), LogsParam.stderr());
                 /*
@@ -321,45 +328,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
 
         if (!(Boolean)properties.getOrDefault(TestEnvironmentProperty.SKIP_TEAR_DOWN, Boolean.FALSE)) {
-            final Set<InetSocketAddress> realPorts = Sets.newLinkedHashSet();
-
-            for (final ContainerAlias containerAlias : ports.keySet()) {
-                if (ports.containsKey(containerAlias)) {
-                    final Set<Integer> containerPorts = ports.get(containerAlias);
-                    for (final Integer port : containerPorts) {
-                        realPorts.add(getServiceAddress(containerAlias, port));
-                    }
-                }
-            }
-
-            for (final String containerId : createdContainerIds) {
-                try {
-                    LOG.info("************************************************************");
-                    LOG.info("Killing container with id: {}", containerId);
-                    LOG.info("************************************************************");
-                    docker.stopContainer(containerId, 5);
-                } catch (final Exception e) {
-                    LOG.error("************************************************************");
-                    LOG.error("Failed to kill container with id: {}", containerId, e);
-                    LOG.error("************************************************************");
-                }
-            }
-
-            for (final InetSocketAddress addr : realPorts) {
-                waitForPortAvailable(addr);
-            }
-
-            for (final String containerId : createdContainerIds) {
-                try {
-                    LOG.info("************************************************************");
-                    LOG.info("Removing container with id: {}", containerId);
-                    LOG.info("************************************************************");
-                    docker.removeContainer(containerId);
-                } catch (final Exception e) {
-                    LOG.error("************************************************************");
-                    LOG.error("Failed to remove container with id: {}", containerId, e);
-                    LOG.error("************************************************************");
-                }
+            for (final String containerId : containerIds) {
+                destroyContainer(containerId);
             }
 
             containerInfoByAlias.clear();
@@ -370,20 +340,60 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
 
         docker.close();
-    };
-
-    private void waitForPortAvailable(final InetSocketAddress addr) {
-        LOG.debug("Waiting for port {} to be available.", addr);
-        if (checkSocket(addr)) {
-            return;
-        }
-        await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(new Callable<Boolean>() {
-            @Override
-            public Boolean call() throws Exception {
-                return checkSocket(addr);
-            }
-        }, is(Boolean.TRUE));
     }
+
+    protected void destroyContainer(final String containerId) {
+        final ContainerAlias alias = getContainerName(containerId);
+
+        LOG.info("************************************************************");
+        LOG.info("Shutting down container {} ({})", alias, containerId);
+        LOG.info("************************************************************");
+
+        final Set<InetSocketAddress> containerSockets;
+
+        if (ports.containsKey(alias)) {
+            containerSockets = ports.get(alias).stream().map(port -> {
+                return getServiceAddress(alias, port);
+            }).collect(Collectors.toSet());
+        } else {
+            containerSockets = Collections.emptySet();
+        }
+
+        try {
+            await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> {
+                try {
+                    LOG.debug("Stopping container {} ({})", alias, containerId);
+                    docker.stopContainer(containerId, 3);
+                } catch (final Exception e) {
+                    LOG.error("Attempt to stop container {} ({}) failed.  Will try again.", alias, containerId, e);
+                }
+
+                return containerSockets.parallelStream().map(addr -> {
+                    if (addr == null) {
+                        return true;
+                    }
+                    return checkSocket(addr);
+                }).allMatch(Predicate.isEqual(Boolean.TRUE));
+            });
+        } catch (final Exception e) {
+            LOG.error("************************************************************");
+            LOG.error("Failed to shut down container {} ({}).  Giving up.", alias, containerId, e);
+            LOG.error("************************************************************");
+        }
+
+        LOG.error("************************************************************");
+        LOG.debug("Removing container {} ({})", alias, containerId);
+        LOG.error("************************************************************");
+        try {
+            docker.removeContainer(containerId);
+        } catch (final Exception e) {
+            if (!(e instanceof ContainerNotFoundException)) {
+                LOG.error("************************************************************");
+                LOG.error("Failed to remove container {} ({}).", alias, containerId, e);
+                LOG.error("************************************************************");
+            }
+        }
+    };
 
     private Boolean checkSocket(final InetSocketAddress addr) {
         try (final Socket sock = new Socket()) {
