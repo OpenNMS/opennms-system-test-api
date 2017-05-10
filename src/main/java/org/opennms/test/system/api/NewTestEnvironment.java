@@ -321,6 +321,17 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
 
         if (!(Boolean)properties.getOrDefault(TestEnvironmentProperty.SKIP_TEAR_DOWN, Boolean.FALSE)) {
+            final Set<InetSocketAddress> realPorts = Sets.newLinkedHashSet();
+
+            for (final ContainerAlias containerAlias : ports.keySet()) {
+                if (ports.containsKey(containerAlias)) {
+                    final Set<Integer> containerPorts = ports.get(containerAlias);
+                    for (final Integer port : containerPorts) {
+                        realPorts.add(getServiceAddress(containerAlias, port));
+                    }
+                }
+            }
+
             for (final String containerId : createdContainerIds) {
                 try {
                     LOG.info("************************************************************");
@@ -334,16 +345,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 }
             }
 
-            for (final ContainerAlias containerAlias : ports.keySet()) {
-                final Set<InetSocketAddress> realPorts = Sets.newHashSet();
-                if (ports.containsKey(containerAlias)) {
-                    for (final Integer port : ports.get(containerAlias)) {
-                        realPorts.add(getServiceAddress(containerAlias, port));
-                    }
-                }
-                for (final InetSocketAddress addr : realPorts) {
-                    waitForPortAvailable(containerAlias, addr);
-                }
+            for (final InetSocketAddress addr : realPorts) {
+                waitForPortAvailable(addr);
             }
 
             for (final String containerId : createdContainerIds) {
@@ -369,27 +372,27 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         docker.close();
     };
 
-    private void waitForPortAvailable(final ContainerAlias alias, final InetSocketAddress addr) {
-        LOG.debug("{}({}): waiting for port to be available.", alias, addr);
-        if (checkSocket(alias, addr)) {
+    private void waitForPortAvailable(final InetSocketAddress addr) {
+        LOG.debug("Waiting for port {} to be available.", addr);
+        if (checkSocket(addr)) {
             return;
         }
         await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(new Callable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
-                return checkSocket(alias, addr);
+                return checkSocket(addr);
             }
         }, is(Boolean.TRUE));
     }
 
-    private Boolean checkSocket(final ContainerAlias alias, final InetSocketAddress addr) {
+    private Boolean checkSocket(final InetSocketAddress addr) {
         try (final Socket sock = new Socket()) {
             sock.connect(addr, 50);
         } catch (final Exception e) {
-            LOG.debug("{}({}): port is available!", alias, addr);
+            LOG.debug("Port {} is available!", addr);
             return true;
         }
-        LOG.debug("{}({}): port is still active. :(", alias, addr);
+        LOG.debug("Port {} is still active. :(", addr);
         return false;
     }
 
@@ -471,9 +474,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         // Advertise Kafka on the Docker host address
         List<String> env = Arrays.asList(new String[] {
-            "ADVERTISED_HOST=" + InetAddress.getLocalHost().getHostAddress(),
-            "ADVERTISED_PORT=" + portBindings.get("9092").get(0).hostPort(),
-            "NUM_PARTITIONS=" + properties.getOrDefault(TestEnvironmentProperty.KAFKA_PARTITIONS, 10)
+                "ADVERTISED_HOST=" + InetAddress.getLocalHost().getHostAddress(),
+                "ADVERTISED_PORT=" + portBindings.get("9092").get(0).hostPort(),
+                "NUM_PARTITIONS=" + properties.getOrDefault(TestEnvironmentProperty.KAFKA_PARTITIONS, 10)
         });
 
         final Builder builder = HostConfig.builder()
@@ -620,14 +623,14 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             }
 
             final Builder builder = HostConfig.builder()
-                                              .publishAllPorts(true)
-                                              .links(links)
-                                              .binds(binds);
+                    .publishAllPorts(true)
+                    .links(links)
+                    .binds(binds);
 
             final List<String> env = Arrays.asList(
-                "MINION_LOCATION=" + MINION_LOCATIONS.get(alias),
-                "MINION_ID=" + MINION_IDS.get(alias)
-            );
+                                                   "MINION_LOCATION=" + MINION_LOCATIONS.get(alias),
+                                                   "MINION_ID=" + MINION_IDS.get(alias)
+                    );
             spawnContainer(alias, builder, env);
         }
     }
@@ -666,7 +669,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      * Spawns a container.
      */
     private void spawnContainer(final ContainerAlias alias, final Builder hostConfigBuilder, final List<String> env) throws DockerException, InterruptedException, IOException {
-    	final HostConfig hostConfig = hostConfigBuilder.build();
+        final HostConfig hostConfig = hostConfigBuilder.build();
         final ContainerConfig containerConfig = ContainerConfig.builder()
                 .image(IMAGES_BY_ALIAS.get(alias))
                 .hostConfig(hostConfig)

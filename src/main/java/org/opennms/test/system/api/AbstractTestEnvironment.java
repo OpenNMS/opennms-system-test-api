@@ -61,7 +61,9 @@ public abstract class AbstractTestEnvironment extends ExternalResourceRule imple
 
     @Override
     public InetSocketAddress getServiceAddress(ContainerInfo info, int port, String type) {
-        LOG.debug("Getting service address for container {}", info);
+        if (info != null) {
+            LOG.debug("Getting service address for container {}/{}", info.id(), info.name());
+        }
         final String portKey = port + "/" + type;
         final List<PortBinding> bindings = info.networkSettings().ports().get(portKey);
         if (bindings == null || bindings.size() == 0) {
