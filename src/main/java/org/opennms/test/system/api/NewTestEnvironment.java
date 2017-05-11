@@ -56,7 +56,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.cxf.helpers.FileUtils;
@@ -192,7 +191,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     /**
      * Keep track of used ports
      */
-    private final Map<ContainerAlias, Set<Integer>> ports = Maps.newConcurrentMap();
+    private final Map<String, Set<InetSocketAddress>> ports = Maps.newConcurrentMap();
 
     /**
      * The Docker daemon client
@@ -342,22 +341,14 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         docker.close();
     }
 
-    protected void destroyContainer(final String containerId) {
+    protected synchronized void destroyContainer(final String containerId) {
         final ContainerAlias alias = getContainerName(containerId);
 
         LOG.info("************************************************************");
         LOG.info("Shutting down container {} ({})", alias, containerId);
         LOG.info("************************************************************");
 
-        final Set<InetSocketAddress> containerSockets;
-
-        if (ports.containsKey(alias)) {
-            containerSockets = ports.get(alias).stream().map(port -> {
-                return getServiceAddress(alias, port);
-            }).collect(Collectors.toSet());
-        } else {
-            containerSockets = Collections.emptySet();
-        }
+        final Set<InetSocketAddress> containerSockets = ports.containsKey(containerId)? ports.get(containerId) : Collections.emptySet();
 
         try {
             await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> {
@@ -381,9 +372,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             LOG.error("************************************************************");
         }
 
-        LOG.error("************************************************************");
+        LOG.debug("************************************************************");
         LOG.debug("Removing container {} ({})", alias, containerId);
-        LOG.error("************************************************************");
+        LOG.debug("************************************************************");
         try {
             docker.removeContainer(containerId);
         } catch (final Exception e) {
@@ -703,11 +694,12 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
 
         if (hostConfig.portBindings() != null) {
-            final Set<Integer> containerPorts = Sets.newConcurrentHashSet();
+            final Set<InetSocketAddress> containerPorts = Sets.newConcurrentHashSet();
             hostConfig.portBindings().keySet().forEach(pb -> {
-                containerPorts.add(Integer.valueOf(pb));
+                final InetSocketAddress addr = getServiceAddress(containerInfo, Integer.valueOf(pb), "tcp");
+                containerPorts.add(addr);
             });
-            ports.put(alias, containerPorts);
+            ports.put(containerId, containerPorts);
         }
 
         containerInfoByAlias.put(alias, containerInfo);
