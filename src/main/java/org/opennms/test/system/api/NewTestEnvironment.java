@@ -56,7 +56,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.cxf.helpers.FileUtils;
@@ -71,7 +70,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.spotify.docker.client.DefaultDockerClient;
 import com.spotify.docker.client.DockerClient;
-import com.spotify.docker.client.DockerClient.ListContainersParam;
 import com.spotify.docker.client.DockerClient.LogsParam;
 import com.spotify.docker.client.LogStream;
 import com.spotify.docker.client.exceptions.ContainerNotFoundException;
@@ -343,36 +341,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         docker.close();
     }
 
-    @Override
-    public Set<ContainerAlias> getContainerAliases() {
-        return containerInfoByAlias.keySet();
-    }
-
-    @Override
-    public ContainerInfo getContainerInfo(final ContainerAlias alias) {
-        return containerInfoByAlias.get(alias);
-    }
-
-    protected ContainerAlias getContainerName(final String containerId) {
-        for (final ContainerAlias alias : start) {
-            final ContainerInfo info = containerInfoByAlias.get(alias);
-            if (info != null && containerId.equals(info.id())) {
-                return alias;
-            }
-        }
-        return null;
-    }
-
-    private List<String> getRunningContainers(final ContainerAlias alias) throws DockerException {
-        try {
-            return docker.listContainers(ListContainersParam.withLabel("org.opennms.alias", alias.toString())).stream().map(container -> container.id()).collect(Collectors.toList());
-        } catch (final InterruptedException e) {
-            LOG.error("Interrupted while listing containers matching " + alias, e);
-            return Collections.emptyList();
-        }
-    }
-
-    private void destroyContainer(final String containerId) {
+    protected synchronized void destroyContainer(final String containerId) {
         final ContainerAlias alias = getContainerName(containerId);
 
         LOG.info("************************************************************");
@@ -415,7 +384,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 LOG.error("************************************************************");
             }
         }
-    }
+    };
 
     private Boolean checkSocket(final InetSocketAddress addr) {
         try (final Socket sock = new Socket()) {
@@ -426,6 +395,26 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
         LOG.debug("Port {} is still active. :(", addr);
         return false;
+    }
+
+    @Override
+    public Set<ContainerAlias> getContainerAliases() {
+        return containerInfoByAlias.keySet();
+    }
+
+    @Override
+    public ContainerInfo getContainerInfo(final ContainerAlias alias) {
+        return containerInfoByAlias.get(alias);
+    }
+
+    private ContainerAlias getContainerName(final String containerId) {
+        for (final ContainerAlias alias : start) {
+            final ContainerInfo info = containerInfoByAlias.get(alias);
+            if (info != null && containerId.equals(info.id())) {
+                return alias;
+            }
+        }
+        return null;
     }
 
     /**
@@ -677,30 +666,13 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnContainer(alias, hostConfigBuilder, Collections.emptyList());
     }
 
-    private void stopContainer(final ContainerAlias alias) {
-        try {
-            final List<String> containers = getRunningContainers(alias);
-            for (final String container : containers) {
-                LOG.debug("*** Stopping Container {} ({}) ***", alias, container);
-                docker.stopContainer(container, 5);
-                destroyContainer(container);
-            }
-        } catch (final Exception e) {
-            LOG.error("Failed to kill container matching alias {}", alias, e);
-        }
-    }
-
     /**
      * Spawns a container.
      */
     private void spawnContainer(final ContainerAlias alias, final Builder hostConfigBuilder, final List<String> env) throws DockerException, InterruptedException, IOException {
-        // make sure there isn't an existing container
-        stopContainer(alias);
-
         final HostConfig hostConfig = hostConfigBuilder.build();
         final ContainerConfig containerConfig = ContainerConfig.builder()
                 .image(IMAGES_BY_ALIAS.get(alias))
-                .labels(Collections.singletonMap("org.opennms.alias", alias.toString()))
                 .hostConfig(hostConfig)
                 .hostname(getName() + ".local")
                 .env(env)
