@@ -1,8 +1,8 @@
 /*******************************************************************************
  * This file is part of OpenNMS(R).
  *
- * Copyright (C) 2016 The OpenNMS Group, Inc.
- * OpenNMS(R) is Copyright (C) 1999-2016 The OpenNMS Group, Inc.
+ * Copyright (C) 2016-2017 The OpenNMS Group, Inc.
+ * OpenNMS(R) is Copyright (C) 1999-2017 The OpenNMS Group, Inc.
  *
  * OpenNMS(R) is a registered trademark of The OpenNMS Group, Inc.
  *
@@ -40,6 +40,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,11 +52,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -103,8 +105,7 @@ import com.spotify.docker.client.messages.PortBinding;
 public class NewTestEnvironment extends AbstractTestEnvironment implements TestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(NewTestEnvironment.class);
-    private static AtomicInteger m_zookeeperPort = new AtomicInteger(2181);
-    private static AtomicInteger m_kafkaPort = new AtomicInteger(9092);
+    private static final Random m_random = new Random();
 
     /**
      * Aliases used to refer to the containers within the tests
@@ -479,8 +480,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         LOG.debug("Starting Kafka");
 
-        final Integer zookeeperPort = m_zookeeperPort.getAndIncrement();
-        final Integer kafkaPort = m_kafkaPort.getAndIncrement();
+        final Integer zookeeperPort = getAvailablePort(2181, 2681);
+        final Integer kafkaPort = getAvailablePort(9092, 9592);
 
         // Bind Kafka and Zookeeper to the same ports on the Docker host
         final Map<String, List<PortBinding>> portBindings = new HashMap<String, List<PortBinding>>();
@@ -497,6 +498,16 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         final Builder builder = HostConfig.builder()
                 .portBindings(portBindings);
         spawnContainer(alias, builder, env);
+    }
+
+    private static int getAvailablePort(final int min, final int max) {
+        final Iterator<Integer> it = m_random.ints(min, max).iterator();
+        while (it.hasNext()) {
+            try (final ServerSocket socket = new ServerSocket(it.next())) {
+                return socket.getLocalPort();
+            } catch (Throwable e) {}
+        }
+        throw new IllegalStateException("Can't find an available network port");
     }
 
     /**
