@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -102,6 +103,8 @@ import com.spotify.docker.client.messages.PortBinding;
 public class NewTestEnvironment extends AbstractTestEnvironment implements TestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(NewTestEnvironment.class);
+    private static AtomicInteger m_zookeeperPort = new AtomicInteger(2181);
+    private static AtomicInteger m_kafkaPort = new AtomicInteger(9092);
 
     /**
      * Aliases used to refer to the containers within the tests
@@ -476,11 +479,13 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         LOG.debug("Starting Kafka");
 
+        final Integer zookeeperPort = m_zookeeperPort.getAndIncrement();
+        final Integer kafkaPort = m_kafkaPort.getAndIncrement();
+
         // Bind Kafka and Zookeeper to the same ports on the Docker host
         final Map<String, List<PortBinding>> portBindings = new HashMap<String, List<PortBinding>>();
-        for (String port : new String[] { "2181", "9092" }) {
-            portBindings.put(port, Collections.singletonList(PortBinding.of("0.0.0.0", port)));
-        }
+        portBindings.put("2181", Collections.singletonList(PortBinding.of("0.0.0.0", zookeeperPort)));
+        portBindings.put("9092", Collections.singletonList(PortBinding.of("0.0.0.0", kafkaPort)));
 
         // Advertise Kafka on the Docker host address
         List<String> env = Arrays.asList(new String[] {
