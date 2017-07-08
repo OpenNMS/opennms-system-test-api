@@ -566,7 +566,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         Builder builder = HostConfig.builder()
                 .privileged(true)
-                .autoRemove(true)
                 .publishAllPorts(true)
                 .links(links)
                 .binds(binds);
