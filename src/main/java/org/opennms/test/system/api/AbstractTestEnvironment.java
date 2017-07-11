@@ -51,7 +51,7 @@ public abstract class AbstractTestEnvironment extends ExternalResourceRule imple
 
     @Override
     public InetSocketAddress getServiceAddress(ContainerAlias alias, int port, String type) {
-        LOG.debug("Getting container info for alias {}", alias);
+        LOG.trace("Getting container info for alias {}", alias);
         final ContainerInfo info = getContainerInfo(alias);
         if (info == null) {
             throw new IllegalArgumentException(String.format("No container found with alias: %s", alias));
@@ -62,7 +62,7 @@ public abstract class AbstractTestEnvironment extends ExternalResourceRule imple
     @Override
     public InetSocketAddress getServiceAddress(ContainerInfo info, int port, String type) {
         if (info != null) {
-            LOG.debug("Getting service address for container {}/{}", info.id(), info.name());
+            LOG.trace("Getting service address for container {}/{}", info.id(), info.name());
         }
         final String portKey = port + "/" + type;
         final List<PortBinding> bindings = info.networkSettings().ports().get(portKey);
