@@ -385,9 +385,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             LOG.error("************************************************************");
         }
 
-        LOG.error("************************************************************");
+        LOG.debug("************************************************************");
         LOG.debug("Removing container {} ({})", alias, containerId);
-        LOG.error("************************************************************");
+        LOG.debug("************************************************************");
         try {
             docker.removeContainer(containerId);
         } catch (final Exception e) {
