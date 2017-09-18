@@ -20,6 +20,7 @@ elasticsearchUrl=http://${ELASTICSEARCH_PORT_9200_TCP_ADDR}:${ELASTICSEARCH_PORT
 EOF
 
 # Point the Apache Kafka sink to the linked container
+mkdir -p "${OPENNMS_HOME}/etc/opennms.properties.d"
 cat > ${OPENNMS_HOME}/etc/opennms.properties.d/kafka-server.properties <<EOF
 org.opennms.core.ipc.sink.kafka.bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
 EOF
