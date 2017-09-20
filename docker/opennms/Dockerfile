@@ -25,5 +25,5 @@ RUN mkdir -p /opt/opennms/data/log
 EXPOSE 1099 5817 8101 8980 18980 61616
 
 WORKDIR /opt/opennms
-ENV JAVA_HOME /usr/lib/jvm/java-1.8.0-openjdk
+ENV JAVA_HOME /usr/lib/jvm/java-1.7.0-openjdk
 CMD ["/opt/opennms/bin/bootstrap.sh"]

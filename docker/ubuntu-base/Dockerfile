@@ -68,9 +68,7 @@ RUN apt-get update && \
 		nfs-client \
 		nsis \
 		ntp \
-		openjdk-8-jdk \
-		oracle-java6-installer \
-		oracle-java7-installer \
+		openjdk-7-jdk \
 		oracle-java8-installer \
 		oracle-java8-set-default \
 		phantomjs \
