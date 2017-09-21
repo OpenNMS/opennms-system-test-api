@@ -21,5 +21,5 @@ RUN mkdir -p /opt/minion/data/log
 EXPOSE 162/udp 1162/udp 1299 514/udp 1514/udp 5150 8201 45444
 
 WORKDIR /opt/minion
-ENV JAVA_HOME /usr/lib/jvm/java-1.8.0-openjdk
+ENV JAVA_HOME /usr/java/latest
 CMD ["/opt/minion/bin/bootstrap.sh"]
