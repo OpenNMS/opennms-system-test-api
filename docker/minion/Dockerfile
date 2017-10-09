@@ -18,7 +18,8 @@ RUN mkdir -p /opt/minion/data/log
 # 514/1514 - Syslog
 # 8201     - Karaf SSH
 # 45444    - RMI Server
-EXPOSE 162/udp 1162/udp 1299 514/udp 1514/udp 5150 8201 45444
+# 50000    - Telemetry
+EXPOSE 162/udp 1162/udp 1299 514/udp 1514/udp 5150 8201 45444 50000/udp
 
 WORKDIR /opt/minion
 ENV JAVA_HOME /usr/java/latest

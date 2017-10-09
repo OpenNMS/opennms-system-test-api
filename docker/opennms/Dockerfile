@@ -22,7 +22,8 @@ RUN mkdir -p /opt/opennms/data/log
 # 8980 - OpenNMS WebUI
 # 18980 - JMX
 # 61616 - ActiveMQ
-EXPOSE 1099 5817 8101 8980 18980 61616
+# 50000 - Telemetry
+EXPOSE 1099 5817 8101 8980 18980 50000/udp 61616
 
 WORKDIR /opt/opennms
 ENV JAVA_HOME /usr/java/latest
