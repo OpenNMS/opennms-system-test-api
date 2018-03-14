@@ -21,7 +21,7 @@ RUN mkdir -p /opt/minion/data/log
 # 50000    - Telemetry
 # 50001    - Telemetry
 # 50002    - Telemetry
-EXPOSE 162/udp 1162/udp 1299 514/udp 1514/udp 5150 8201 45444 50000/udp 50001/udp 50002/udp
+EXPOSE 162/udp 1162/udp 1299 514/udp 1514/udp 5150 8201 45444 50000/udp 50001/udp 50002/udp 50003/udp
 
 WORKDIR /opt/minion
 ENV JAVA_HOME /usr/java/latest
