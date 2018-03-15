@@ -15,9 +15,11 @@ elasticsearchTransportPort=${ELASTICSEARCH_PORT_9300_TCP_PORT}
 EOF
 
 # Point Elasticsearch REST to the linked container
+if [ -ne ${OPENNMS_HOME}/etc/org.opennms.plugin.elasticsearch.rest.forwarder.cfg ]; then
 cat > ${OPENNMS_HOME}/etc/org.opennms.plugin.elasticsearch.rest.forwarder.cfg <<EOF
 elasticsearchUrl=http://${ELASTICSEARCH_PORT_9200_TCP_ADDR}:${ELASTICSEARCH_PORT_9200_TCP_PORT}
 EOF
+fi
 
 # Point the Apache Kafka sink to the linked container
 mkdir -p "${OPENNMS_HOME}/etc/opennms.properties.d"
