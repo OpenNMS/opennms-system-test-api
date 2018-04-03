@@ -13,8 +13,13 @@ buildNumber.properties
 .settings
 .project
 
+# Intellij
+.idea
+*.iml
+
 # vim
 *.swp
 
 # Artifacts
 *.rpm
+

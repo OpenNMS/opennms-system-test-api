@@ -98,6 +98,7 @@ import com.spotify.docker.client.messages.PortBinding;
  *  <li>kafka: An optional instance of Apache Kafka to test Minion's Kafka support</li>
  *  <li>elasticsearch2: An optional instance of Elasticsearch 2.X</li>
  *  <li>elasticsearch5: An optional instance of Elasticsearch 5.X</li>
+ *  <li>elasticsearch6: An optional instance of Elasticsearch 6.X</li>
  * </ul>
  *
  * @author jwhite
@@ -114,6 +115,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     public static enum ContainerAlias {
         ELASTICSEARCH_2,
         ELASTICSEARCH_5,
+        ELASTICSEARCH_6,
         KAFKA,
         MINION,
         MINION_SAME_LOCATION,
@@ -147,6 +149,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             new ImmutableMap.Builder<ContainerAlias, String>()
             .put(ContainerAlias.ELASTICSEARCH_2, "elasticsearch:2-alpine")
             .put(ContainerAlias.ELASTICSEARCH_5, "elasticsearch:5-alpine")
+            .put(ContainerAlias.ELASTICSEARCH_6, "docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.3")
             .put(ContainerAlias.KAFKA, "spotify/kafka@sha256:cf8f8f760b48a07fb99df24fab8201ec8b647634751e842b67103a25a388981b")
             .put(ContainerAlias.MINION, "stests/minion")
             .put(ContainerAlias.MINION_SAME_LOCATION, "stests/minion")
@@ -222,6 +225,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnKafka();
         spawnElasticsearch2();
         spawnElasticsearch5();
+        spawnElasticsearch6();
 
         spawnPostgres();
         waitForPostgres();
@@ -452,6 +456,10 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
     private void spawnElasticsearch5() throws DockerException, InterruptedException, IOException {
         spawnElasticsearch(ContainerAlias.ELASTICSEARCH_5);
+    }
+
+    private void spawnElasticsearch6() throws DockerException, InterruptedException, IOException {
+        spawnElasticsearch(ContainerAlias.ELASTICSEARCH_6);
     }
 
     /**

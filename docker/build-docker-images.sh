@@ -15,6 +15,7 @@ run docker pull spotify/kafka@sha256:cf8f8f760b48a07fb99df24fab8201ec8b647634751
 echo "Pulling elasticsearch images from public registry"
 run docker pull elasticsearch:2-alpine
 run docker pull elasticsearch:5-alpine
+run docker pull docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.3
 
 echo "Building base image"
 run docker build -t stests/base ./base

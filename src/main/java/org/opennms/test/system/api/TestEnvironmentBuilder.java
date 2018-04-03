@@ -213,6 +213,15 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
+    public TestEnvironmentBuilder es6() {
+        if (m_containers.contains(ContainerAlias.ELASTICSEARCH_6)) {
+            return this;
+        }
+
+        m_containers.add(ContainerAlias.ELASTICSEARCH_6);
+        return this;
+    }
+
     public TestEnvironmentBuilder opennms() {
         if (m_containers.contains(ContainerAlias.OPENNMS)) {
             return this;
