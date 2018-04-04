@@ -566,6 +566,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_2).name()));
         } else if (isEnabled(ContainerAlias.ELASTICSEARCH_5)) {
             links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_5).name()));
+        } else if (isEnabled(ContainerAlias.ELASTICSEARCH_6)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_6).name()));
         }
 
         if (isEnabled(ContainerAlias.KAFKA)) {
