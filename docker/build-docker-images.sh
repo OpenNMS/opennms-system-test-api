@@ -33,6 +33,13 @@ else
 	echo "WARNING: No minion RPMs.  Skipping minion image."
 fi
 
+if [ `find sentinel/rpms -name \*.rpm | wc -l` -gt 0 ]; then
+	echo "Building Sentinel image"
+	run docker build -t stests/sentinel ./sentinel
+else
+	echo "WARNING: No sentinel RPMs.  Skipping sentinel image."
+fi
+
 echo "Building OpenNMS image"
 run docker build -t stests/opennms ./opennms
 

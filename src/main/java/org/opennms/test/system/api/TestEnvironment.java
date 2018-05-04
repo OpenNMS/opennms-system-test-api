@@ -37,10 +37,10 @@ import com.spotify.docker.client.messages.ContainerInfo;
 
 /**
  * The system test rule is responsible for ensuring that a valid
- * Minion TestEnvironment is setup before invoking any tests.
+ * TestEnvironment is setup before invoking any tests.
  *
  * Further, the test rule must provide all of the details required
- * to communicate with the Minion TestEnvironment, whether it be on the current
+ * to communicate with the TestEnvironment, whether it be on the current
  * or a remote host.
  * 
  * @author jwhite
