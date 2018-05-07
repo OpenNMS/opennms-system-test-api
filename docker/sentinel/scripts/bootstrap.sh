@@ -16,9 +16,11 @@ bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
 acks=1
 EOF
 
-echo "Overlaying files from /sentinel-docker-overlay/ onto ${SENTINEL_HOME}"
-find /sentinel-docker-overlay -ls
-rsync -ar /sentinel-docker-overlay/ "${SENTINEL_HOME}"/
+if [ -d /sentinel-docker-overlay/ ]; then
+	echo "Overlaying files from /sentinel-docker-overlay/ onto ${SENTINEL_HOME}"
+	find /sentinel-docker-overlay -ls
+	rsync -ar /sentinel-docker-overlay/ "${SENTINEL_HOME}"/
+fi
 
 find "${SENTINEL_HOME}/data" -type d | grep -vE "(data|data/log)$" | sort -ur | while read DIR; do
 	rm -rf "$DIR"

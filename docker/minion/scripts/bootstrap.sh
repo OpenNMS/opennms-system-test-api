@@ -21,9 +21,11 @@ bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
 acks=1
 EOF
 
-echo "Overlaying files from /minion-docker-overlay/ onto ${MINION_HOME}"
-find /minion-docker-overlay -ls
-rsync -ar /minion-docker-overlay/ "${MINION_HOME}"/
+if [ -d /minion-docker-overlay/ ]; then
+	echo "Overlaying files from /minion-docker-overlay/ onto ${MINION_HOME}"
+	find /minion-docker-overlay -ls
+	rsync -ar /minion-docker-overlay/ "${MINION_HOME}"/
+fi
 
 find "${MINION_HOME}/data" -type d | grep -vE "(data|data/log)$" | sort -ur | while read DIR; do
 	rm -rf "$DIR"

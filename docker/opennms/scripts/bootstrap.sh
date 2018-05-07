@@ -51,9 +51,11 @@ fi
 #wq
 #EOF
 
-echo "Overlaying files from /opennms-docker-overlay/ onto ${OPENNMS_HOME}"
-find /opennms-docker-overlay -ls
-rsync -ar /opennms-docker-overlay/ "${OPENNMS_HOME}"/
+if [ -d /opennms-docker-overlay/ ]; then
+	echo "Overlaying files from /opennms-docker-overlay/ onto ${OPENNMS_HOME}"
+	find /opennms-docker-overlay -ls
+	rsync -ar /opennms-docker-overlay/ "${OPENNMS_HOME}"/
+fi
 
 echo "Waiting for Postgres to start..."
 WAIT=0
