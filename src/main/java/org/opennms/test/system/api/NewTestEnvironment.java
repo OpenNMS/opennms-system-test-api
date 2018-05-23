@@ -657,9 +657,16 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         binds.add(sentinelKarafLogs.toString() + ":/opt/sentinel/data/log");
 
         final List<String> links = Lists.newArrayList();
-        //links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
-        links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
-        links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
+        links.add(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
+        links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
+
+        if (isEnabled(ContainerAlias.ELASTICSEARCH_2)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_2).name()));
+        } else if (isEnabled(ContainerAlias.ELASTICSEARCH_5)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_5).name()));
+        } else if (isEnabled(ContainerAlias.ELASTICSEARCH_6)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_6).name()));
+        }
 
         if (isEnabled(ContainerAlias.KAFKA)) {
             links.add(String.format("%s:kafka", containerInfoByAlias.get(ContainerAlias.KAFKA).name()));
