@@ -93,6 +93,7 @@ import com.spotify.docker.client.messages.PortBinding;
  *  <li>postgres: An instance of PostgreSQL</li> 
  *  <li>opennms: An instance of OpenNMS</li>
  *  <li>minion: An instance of Minion</li>
+ *  <li>sentinel: An instance of Sentinel</li>
  *  <li>snmpd: An instance of Net-SNMP (used to test SNMP support)</li>
  *  <li>tomcat: An instance of Tomcat (used to test JMX support)</li>
  *  <li>kafka: An optional instance of Apache Kafka to test Minion's Kafka support</li>
@@ -120,6 +121,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         MINION,
         MINION_SAME_LOCATION,
         MINION_OTHER_LOCATION,
+        SENTINEL,
         OPENNMS,
         POSTGRES,
         SNMPD,
@@ -154,6 +156,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             .put(ContainerAlias.MINION, "stests/minion")
             .put(ContainerAlias.MINION_SAME_LOCATION, "stests/minion")
             .put(ContainerAlias.MINION_OTHER_LOCATION, "stests/minion")
+            .put(ContainerAlias.SENTINEL, "stests/sentinel")
             .put(ContainerAlias.OPENNMS, "stests/opennms")
             .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
             .put(ContainerAlias.SNMPD, "stests/snmpd")
@@ -179,6 +182,11 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      * The location of the files to be overlaid into /opt/minion.
      */
     private Path minionOverlayDirectory;
+
+    /**
+     * The location of the files to be overlaid into /opt/sentinel.
+     */
+    private Path sentinelOverlayDirectory;
 
     /**
      * A collection of containers that should be started by default
@@ -214,6 +222,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         this.name = name;
     }
 
+    public NewTestEnvironment(final String name, final EnumMap<TestEnvironmentProperty,Object> properties, final Path overlayDirectory, final Path minionOverlayDirectory, final Path sentinelOverlayDirectory, final Collection<ContainerAlias> containers) {
+        this.properties = properties;
+        this.overlayDirectory = overlayDirectory;
+        this.minionOverlayDirectory = minionOverlayDirectory;
+        this.sentinelOverlayDirectory = sentinelOverlayDirectory;
+        this.start = containers;
+        this.name = name;
+    }
+
     public String getName() {
         return this.name == null? this.description.getTestClass().getSimpleName() : this.name;
     }
@@ -236,6 +253,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnSnmpd();
         spawnTomcat();
         spawnMinions();
+        spawnSentinel();
 
         LOG.debug("Waiting for other containers to be ready: {}", start);
 
@@ -243,6 +261,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         waitForSnmpd();
         waitForTomcat();
         waitForMinions();
+        waitForSentinel();
     };
 
     @Override
@@ -267,7 +286,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             ) {
                 Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
             } catch (DockerException|InterruptedException|IOException e) {
-                LOG.warn("Failed to copy the logs directory from the Dominion container.", e);
+                LOG.warn("Failed to copy the logs directory from the Minion container.", e);
             }
 
             destination = Paths.get("target/opennms.karaf.logs.tar");
@@ -276,7 +295,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                  ) {
                 Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
             } catch (DockerException|InterruptedException|IOException e) {
-                LOG.warn("Failed to copy the data/log directory from the Dominion container.", e);
+                LOG.warn("Failed to copy the data/log directory from the Minion container.", e);
             }
         } else {
             LOG.warn("No OpenNMS container provisioned. Logs won't be copied.");
@@ -596,6 +615,72 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     }
 
     /**
+     * Spawns the Sentinel container.
+     */
+    private void spawnSentinel() throws DockerException, InterruptedException, IOException {
+        final ContainerAlias alias = ContainerAlias.SENTINEL;
+        if (!(isEnabled(alias) && isSpawned(alias))) {
+            return;
+        }
+
+        final Path overlayRoot = initializeOverlayRoot(alias);
+
+        final Path sentinelOverlay = overlayRoot.resolve("sentinel-overlay");
+        final Path sentinelKarafLogs = overlayRoot.resolve("sentinel-karaf-logs");
+
+        Files.createDirectories(sentinelOverlay.resolve("etc"));
+        Files.createDirectories(sentinelKarafLogs);
+
+        try (final FileWriter fw = new FileWriter(sentinelOverlay.resolve("etc/clean.disabled").toFile())) {
+            fw.write("true\n".toCharArray());
+        }
+
+        if (this.sentinelOverlayDirectory != null) {
+            Files.find(this.sentinelOverlayDirectory, 10, (path, attr) -> {
+                return path.toFile().isFile();
+            }).forEach(path -> {
+                final Path relative = Paths.get(this.sentinelOverlayDirectory.toFile().toURI().relativize(path.toFile().toURI()).getPath());
+                final Path to = Paths.get(sentinelOverlay.toString(), relative.toString());
+                LOG.debug("Copying {} to {}", path.toAbsolutePath(), to.toAbsolutePath());
+                try {
+                    Files.createDirectories(to.getParent());
+                    Files.deleteIfExists(to.toAbsolutePath());
+                    Files.copy(path.toAbsolutePath(), to.toAbsolutePath(), StandardCopyOption.REPLACE_EXISTING);
+                } catch (final Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        final List<String> binds = new ArrayList<>();
+        binds.add(sentinelOverlay.toString() + ":/sentinel-docker-overlay");
+        binds.add(sentinelKarafLogs.toString() + ":/opt/sentinel/data/log");
+
+        final List<String> links = Lists.newArrayList();
+        links.add(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
+        links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
+
+        if (isEnabled(ContainerAlias.ELASTICSEARCH_2)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_2).name()));
+        } else if (isEnabled(ContainerAlias.ELASTICSEARCH_5)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_5).name()));
+        } else if (isEnabled(ContainerAlias.ELASTICSEARCH_6)) {
+            links.add(String.format("%s:elasticsearch", containerInfoByAlias.get(ContainerAlias.ELASTICSEARCH_6).name()));
+        }
+
+        if (isEnabled(ContainerAlias.KAFKA)) {
+            links.add(String.format("%s:kafka", containerInfoByAlias.get(ContainerAlias.KAFKA).name()));
+        }
+
+        final Builder builder = HostConfig.builder()
+                .publishAllPorts(true)
+                .links(links)
+                .binds(binds);
+
+        spawnContainer(alias, builder, Collections.emptyList());
+    }
+
+    /**
      * Spawns the Tomcat container.
      */
     private void spawnTomcat() throws DockerException, InterruptedException, IOException {
@@ -851,6 +936,22 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             return;
         }
 
+    }
+
+    /**
+     * Blocks until the Karaf Shell service is available.
+     */
+    private void waitForSentinel() throws Exception {
+        final ContainerAlias alias = ContainerAlias.SENTINEL;
+        if (!isEnabled(alias)) {
+            return;
+        }
+
+        final InetSocketAddress sshAddr = getServiceAddress(alias, 8301);
+        LOG.info("************************************************************");
+        LOG.info("Waiting for Sentinel @ {} to start.", sshAddr);
+        LOG.info("************************************************************");
+        await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, true));
     }
 
     /**

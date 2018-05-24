@@ -151,6 +151,8 @@ public class TestEnvironmentBuilder {
 
     private EnvironmentBuilder m_minionEnvironmentBuilder;
 
+    private EnvironmentBuilder m_sentinelEnvironmentBuilder;
+
     public TestEnvironmentBuilder() {
     }
 
@@ -167,6 +169,7 @@ public class TestEnvironmentBuilder {
     public TestEnvironmentBuilder all() {
         opennms();
         minion();
+        sentinel();
         snmpd();
         tomcat();
 
@@ -232,6 +235,14 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
+    public TestEnvironmentBuilder sentinel() {
+        if (m_containers.contains(ContainerAlias.SENTINEL)) {
+            return this;
+        }
+        m_containers.add(ContainerAlias.SENTINEL);
+        return this;
+    }
+
     public TestEnvironmentBuilder minion() {
         if (m_containers.contains(ContainerAlias.MINION)) {
             return this;
@@ -286,6 +297,13 @@ public class TestEnvironmentBuilder {
         return m_minionEnvironmentBuilder;
     }
 
+    public EnvironmentBuilder withSentinelEnvironment() {
+        if (m_sentinelEnvironmentBuilder == null) {
+            m_sentinelEnvironmentBuilder = new EnvironmentBuilder();
+        }
+        return m_sentinelEnvironmentBuilder;
+    }
+
     public TestEnvironment build() {
         if (m_containers.size() == 0) {
             all();
@@ -297,8 +315,9 @@ public class TestEnvironmentBuilder {
         } else {
             final Path opennmsOverlay = (m_opennmsEnvironmentBuilder == null ? null : m_opennmsEnvironmentBuilder.build());
             final Path minionOverlay = (m_minionEnvironmentBuilder == null ? null : m_minionEnvironmentBuilder.build());
+            final Path sentinelOverlay = (m_sentinelEnvironmentBuilder == null ? null : m_sentinelEnvironmentBuilder.build());
 
-            return new NewTestEnvironment(m_name, properties, opennmsOverlay, minionOverlay, m_containers);
+            return new NewTestEnvironment(m_name, properties, opennmsOverlay, minionOverlay, sentinelOverlay, m_containers);
         }
     }
 }
