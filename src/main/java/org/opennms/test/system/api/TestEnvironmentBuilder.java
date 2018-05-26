@@ -169,7 +169,10 @@ public class TestEnvironmentBuilder {
     public TestEnvironmentBuilder all() {
         opennms();
         minion();
-        sentinel();
+        // The Sentinel image is not available in all builds that currently use this API,
+        // so we need the callers to either opt-in to use it, or find a way to include it
+        // if it is available
+        //sentinel();
         snmpd();
         tomcat();
 
