@@ -735,10 +735,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             binds.add(minionKarafLogs.toString() + ":/opt/minion/data/log");
 
             final List<String> links = Lists.newArrayList();
-            links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
-            links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
-            links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
-
+            if (isEnabled(ContainerAlias.OPENNMS)) {
+                links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
+            }
+            if (isEnabled(ContainerAlias.SNMPD)) {
+                links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
+            }
+            if (isEnabled(ContainerAlias.TOMCAT)) {
+                links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
+            }
             if (isEnabled(ContainerAlias.KAFKA)) {
                 links.add(String.format("%s:kafka", containerInfoByAlias.get(ContainerAlias.KAFKA).name()));
             }
