@@ -9,7 +9,7 @@ fi
 test -e $OPENNMS_RPM_ROOT || (echo "Cannot find RPM directory '$OPENNMS_RPM_ROOT'." && exit 1)
 
 # Grab the release number from one of the known RPMs so we can filter the RPMs we need
-RELEASE="$(rpm -q --queryformat='%{version}-%{release}' "$OPENNMS_RPM_ROOT"/opennms-core-*.noarch.rpm)"
+RELEASE="$(rpm -q --queryformat='%{version}-%{release}' -p "$OPENNMS_RPM_ROOT"/opennms-core-*.noarch.rpm)"
 
 mkdir -p opennms/rpms
 rm -rf opennms/rpms/*.rpm
