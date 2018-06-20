@@ -20,6 +20,13 @@ bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
 acks=1
 EOF
 
+# Point PostgreSQL to the linked container
+cat > ${SENTINEL_HOME}/etc/org.opennms.netmgt.distributed.datasource.cfg <<EOF
+datasource.url=jdbc:postgresql://${POSTGRES_PORT_5432_TCP_ADDR}:${POSTGRES_PORT_5432_TCP_PORT}/opennms
+datasource.username=${POSTGRES_USER:=postgres}
+datasource.password=${POSTGRES_PASSWORD}
+EOF
+
 if [ -d /sentinel-docker-overlay/ ]; then
 	echo "Overlaying files from /sentinel-docker-overlay/ onto ${SENTINEL_HOME}"
 	find /sentinel-docker-overlay -ls
