@@ -7,7 +7,7 @@ RUN ls -la /*.rpm && \
 	rm -rf /*.rpm && \
 	yum -y clean all
 
-COPY etc     /opt/sentinel/etc
+#COPY etc     /opt/sentinel/etc
 COPY scripts /opt/sentinel/bin
 
 RUN mkdir -p /opt/sentinel/data/log
