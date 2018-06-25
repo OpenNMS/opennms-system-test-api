@@ -17,7 +17,6 @@ echo "broker-url = failover:tcp://${OPENNMS_PORT_61616_TCP_ADDR}:${OPENNMS_PORT_
 # Configure Apache Kafka as consumer
 cat > ${SENTINEL_HOME}/etc/org.opennms.core.ipc.sink.kafka.consumer.cfg <<EOF
 bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
-acks=1
 EOF
 
 # Point PostgreSQL to the linked container
