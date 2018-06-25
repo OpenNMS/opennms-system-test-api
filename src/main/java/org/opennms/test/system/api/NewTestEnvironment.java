@@ -956,6 +956,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         LOG.info("************************************************************");
         LOG.info("Waiting for Sentinel @ {} to start.", sshAddr);
         LOG.info("************************************************************");
+        await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> canSentinelConnectToOpennms(sshAddr));
         await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, true));
     }
 
@@ -978,19 +979,27 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     }
 
     public boolean canMinionConnectToOpenNMS(InetSocketAddress sshAddr) {
+        return canContainerConntectToOpenNMS(sshAddr, "Minion");
+    }
+
+    public boolean canSentinelConnectToOpennms(InetSocketAddress sshAddr) {
+        return canContainerConntectToOpenNMS(sshAddr, "Sentinel");
+    }
+
+    private boolean canContainerConntectToOpenNMS(InetSocketAddress sshAddr, String containerName) {
         try (final SshClient sshClient = new SshClient(sshAddr, "admin", "admin")) {
             // Issue the 'minion:ping' command
             PrintStream pipe = sshClient.openShell();
-            pipe.println("minion:ping");
+            pipe.println(String.format("%s:ping", containerName.toLowerCase()));
             pipe.println("logout");
 
             await().atMost(2, MINUTES).until(sshClient.isShellClosedCallable());
 
             // Grab the output
             String shellOutput = sshClient.getStdout();
-            LOG.info("minion:ping output: {}", shellOutput);
+            LOG.info("{}:ping output: {}", containerName.toLowerCase(), shellOutput);
 
-            // We're expecting output of the form
+            // We're expecting output of the form (for minion)
             // admin@minion> minion:ping
             // Connecting to ReST...
             // OK
@@ -1000,7 +1009,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             // So it is sufficient to check for 2 'OK's
             return StringUtils.countMatches(shellOutput, "OK") >= 2;
         } catch (Exception e) {
-            LOG.error("Failed to reach the Minion from OpenNMS.", e);
+            LOG.error("Failed to reach the OpenNMS from {}.", containerName, e);
         }
         return false;
     }
