@@ -14,8 +14,8 @@ sed -i s/rmiServerHost.*/rmiServerHost=0.0.0.0/g "${SENTINEL_HOME}/etc/org.apach
 echo "http-url = http://${OPENNMS_PORT_8980_TCP_ADDR}:${OPENNMS_PORT_8980_TCP_PORT}/opennms" >> ${SENTINEL_HOME}/etc/org.opennms.sentinel.controller.cfg
 echo "broker-url = failover:tcp://${OPENNMS_PORT_61616_TCP_ADDR}:${OPENNMS_PORT_61616_TCP_PORT}" >> ${SENTINEL_HOME}/etc/org.opennms.sentinel.controller.cfg
 
-# Point the Apache Kafka sink to the linked container
-cat > ${SENTINEL_HOME}/etc/org.opennms.core.ipc.sink.kafka.cfg <<EOF
+# Configure Apache Kafka as consumer
+cat > ${SENTINEL_HOME}/etc/org.opennms.core.ipc.sink.kafka.consumer.cfg <<EOF
 bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
 acks=1
 EOF
