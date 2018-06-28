@@ -253,11 +253,15 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnSnmpd();
         spawnTomcat();
         spawnMinions();
-        spawnSentinel();
 
         LOG.debug("Waiting for other containers to be ready: {}", start);
 
         waitForOpenNMS();
+
+        // Sentinel may require database access and opennms sets it up on first start,
+        // therefore we must wait for opennms, before sentinel can be spawned
+        spawnSentinel();
+
         waitForSnmpd();
         waitForTomcat();
         waitForMinions();
