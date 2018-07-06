@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelShell;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 
@@ -92,6 +93,7 @@ public class SshClient implements AutoCloseable {
         session.connect();
 
         channel = session.openChannel("shell");
+        ((ChannelShell)channel).setPtySize(500, 100, 1920, 1080);
         stdout = channel.getInputStream();
         stderr = channel.getExtInputStream();
         channel.connect(timeout);
