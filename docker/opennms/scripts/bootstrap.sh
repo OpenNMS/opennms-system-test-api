@@ -25,6 +25,7 @@ fi
 mkdir -p "${OPENNMS_HOME}/etc/opennms.properties.d"
 cat > ${OPENNMS_HOME}/etc/opennms.properties.d/kafka-server.properties <<EOF
 org.opennms.core.ipc.sink.kafka.bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
+org.opennms.core.ipc.rpc.kafka.bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
 EOF
 
 # Expose the Karaf shell

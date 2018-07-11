@@ -21,6 +21,12 @@ bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
 acks=1
 EOF
 
+# Point the Apache Kafka RPC to the linked container
+cat > ${MINION_HOME}/etc/org.opennms.core.ipc.rpc.kafka.cfg <<EOF
+bootstrap.servers=${KAFKA_PORT_9092_TCP_ADDR}:${KAFKA_PORT_9092_TCP_PORT}
+acks=1
+EOF
+
 if [ -d /minion-docker-overlay/ ]; then
 	echo "Overlaying files from /minion-docker-overlay/ onto ${MINION_HOME}"
 	find /minion-docker-overlay -ls
