@@ -526,6 +526,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 "NUM_PARTITIONS=" + properties.getOrDefault(TestEnvironmentProperty.KAFKA_PARTITIONS, 10)
         });
 
+        LOG.info("About to start kafka container with the following env settings: {}", env);
+
         final Builder builder = HostConfig.builder()
                 .portBindings(portBindings);
         spawnContainer(alias, builder, env);
