@@ -1,8 +1,8 @@
 /*******************************************************************************
  * This file is part of OpenNMS(R).
  *
- * Copyright (C) 2016-2017 The OpenNMS Group, Inc.
- * OpenNMS(R) is Copyright (C) 1999-2017 The OpenNMS Group, Inc.
+ * Copyright (C) 2016-2018 The OpenNMS Group, Inc.
+ * OpenNMS(R) is Copyright (C) 1999-2018 The OpenNMS Group, Inc.
  *
  * OpenNMS(R) is a registered trademark of The OpenNMS Group, Inc.
  *
@@ -521,7 +521,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         // Advertise Kafka on the Docker host address
         List<String> env = Arrays.asList(new String[] {
-                "ADVERTISED_HOST=" + InetAddress.getLocalHost().getHostAddress(),
+                "ADVERTISED_HOST=" + System.getProperty("org.opennms.advertised-host-address", InetAddress.getLocalHost().getHostAddress()),
                 "ADVERTISED_PORT=" + portBindings.get("9092").get(0).hostPort(),
                 "NUM_PARTITIONS=" + properties.getOrDefault(TestEnvironmentProperty.KAFKA_PARTITIONS, 10)
         });
