@@ -27,20 +27,9 @@
  *******************************************************************************/
 package org.opennms.test.system.api.utils;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.concurrent.Callable;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Utilities for testing network connectivity.
@@ -48,41 +37,6 @@ import org.slf4j.LoggerFactory;
  * @author jwhite
  */
 public class NetUtils {
-    private static final Logger LOG = LoggerFactory.getLogger(NetUtils.class);
-
-    public static InetAddress getNonLocalAddress() throws UnknownHostException {
-        final Collection<InetAddress> addrs = NetUtils.getNonLocalAddresses();
-        if (addrs.isEmpty()) {
-            LOG.warn("No non-loopback, non-link-local addresses found. Falling back to InetAddress.getLocalHost();");
-            return InetAddress.getLocalHost();
-        }
-        final InetAddress ret = addrs.iterator().next();
-        if (addrs.size() > 1) {
-            LOG.warn("Found more than one non-loopback, non-link-local address ({}). Returning the first match.", addrs, ret);
-        }
-        return ret;
-    }
-
-    public static Collection<InetAddress> getNonLocalAddresses() throws UnknownHostException {
-        final Set<InetAddress> addrs = new LinkedHashSet<>();
-        try {
-            final ArrayList<NetworkInterface> list = Collections.list(NetworkInterface.getNetworkInterfaces());
-            for (final NetworkInterface iface : list) {
-                if (!iface.isLoopback() && !iface.isPointToPoint() && iface.isUp()) {
-                    for (final InetAddress inetAddr : Collections.list(iface.getInetAddresses())) {
-                        if (!inetAddr.isLoopbackAddress() && !inetAddr.isLinkLocalAddress()) {
-                            addrs.add(inetAddr);
-                        }
-                    }
-                }
-            }
-            LOG.debug("Found addresses: {}", addrs);
-            return addrs;
-        } catch (final Exception e) {
-            LOG.warn("Failed to determine primary interface.", e);
-        }
-        return Collections.emptyList();
-    }
 
     public static boolean isTcpPortOpen(int port) {
         return isTcpPortOpen(new InetSocketAddress("127.0.0.1", port));

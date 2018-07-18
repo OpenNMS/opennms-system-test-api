@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -62,7 +63,6 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.cxf.helpers.FileUtils;
-import org.opennms.test.system.api.utils.NetUtils;
 import org.opennms.test.system.api.utils.RestClient;
 import org.opennms.test.system.api.utils.SshClient;
 import org.slf4j.Logger;
@@ -521,7 +521,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         // Advertise Kafka on the Docker host address
         List<String> env = Arrays.asList(new String[] {
-                "ADVERTISED_HOST=" + NetUtils.getNonLocalAddress().getHostAddress(),
+                "ADVERTISED_HOST=" + InetAddress.getLocalHost().getHostAddress(),
                 "ADVERTISED_PORT=" + portBindings.get("9092").get(0).hostPort(),
                 "NUM_PARTITIONS=" + properties.getOrDefault(TestEnvironmentProperty.KAFKA_PARTITIONS, 10)
         });
