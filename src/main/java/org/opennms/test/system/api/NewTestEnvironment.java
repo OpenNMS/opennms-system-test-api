@@ -910,7 +910,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         LOG.info("************************************************************");
         LOG.info("Waiting for OpenNMS SSH service @ {}.", sshAddr);
         LOG.info("************************************************************");
-        await().atMost(2, MINUTES).pollInterval(5, SECONDS).until(SshClient.canConnectViaSsh(sshAddr, "admin", "admin"));
+        await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(SshClient.canConnectViaSsh(sshAddr, "admin", "admin"));
         await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, false));
         LOG.info("************************************************************");
         LOG.info("OpenNMS's Karaf Shell is online.");
