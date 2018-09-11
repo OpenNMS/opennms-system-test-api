@@ -125,7 +125,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         OPENNMS,
         POSTGRES,
         SNMPD,
-        TOMCAT
+        TOMCAT,
+        CASSANDRA
     }
 
     @SuppressWarnings("serial")
@@ -161,6 +162,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
             .put(ContainerAlias.SNMPD, "stests/snmpd")
             .put(ContainerAlias.TOMCAT, "stests/tomcat")
+            .put(ContainerAlias.CASSANDRA, "cassandra:3.11")
             .build();
 
     /**
@@ -243,6 +245,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnElasticsearch2();
         spawnElasticsearch5();
         spawnElasticsearch6();
+        spawnCassandra();
+        waitForCassandra();
 
         spawnPostgres();
         waitForPostgres();
@@ -266,7 +270,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         waitForTomcat();
         waitForMinions();
         waitForSentinel();
-    };
+    }
 
     @Override
     protected void after(final boolean didFail, final Throwable failure) {
@@ -578,6 +582,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             });
         }
 
+        final List<String> env = new ArrayList<>();
+
         final List<String> binds = new ArrayList<>();
         binds.add(opennmsOverlay.toString() + ":/opennms-docker-overlay");
         binds.add(opennmsLogs.toString() + ":/var/log/opennms");
@@ -598,6 +604,10 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         if (isEnabled(ContainerAlias.KAFKA)) {
             links.add(String.format("%s:kafka", containerInfoByAlias.get(ContainerAlias.KAFKA).name()));
         }
+        if (isEnabled(ContainerAlias.CASSANDRA)) {
+            links.add(String.format("%s:cassandra", containerInfoByAlias.get(ContainerAlias.CASSANDRA).name()));
+            env.add("USE_NEWTS=true");
+        }
 
         Builder builder = HostConfig.builder()
                 .privileged(true)
@@ -605,7 +615,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 .links(links)
                 .binds(binds);
 
-        spawnContainer(alias, builder, Collections.emptyList());
+        spawnContainer(alias, builder, env);
     }
 
     /**
@@ -677,6 +687,9 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         if (isEnabled(ContainerAlias.KAFKA)) {
             links.add(String.format("%s:kafka", containerInfoByAlias.get(ContainerAlias.KAFKA).name()));
         }
+        if (isEnabled(ContainerAlias.CASSANDRA)) {
+            links.add(String.format("%s:cassandra", containerInfoByAlias.get(ContainerAlias.CASSANDRA).name()));
+        }
 
         final Builder builder = HostConfig.builder()
                 .publishAllPorts(true)
@@ -696,6 +709,20 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
 
         spawnContainer(alias, HostConfig.builder(), Collections.emptyList());
+    }
+
+    /**
+     * Spawns the cassandra container.
+     */
+    private void spawnCassandra() throws InterruptedException, DockerException, IOException {
+        final ContainerAlias alias = ContainerAlias.CASSANDRA;
+        if (! isEnabled(alias) && isSpawned(alias)) {
+            return;
+        }
+        final List<String> env = Arrays.asList(new String[] {
+                "CASSANDRA_BROADCAST_ADDRESS=" + System.getProperty("org.opennms.advertised-host-address", InetAddress.getLocalHost().getHostAddress()),
+        });
+        spawnContainer(alias, HostConfig.builder().publishAllPorts(true), env);
     }
 
     /**
@@ -867,6 +894,39 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         };
         LOG.info("************************************************************");
         LOG.info("Waiting for PostgreSQL service @ {}.", postgresAddr);
+        LOG.info("************************************************************");
+        await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(isConnected, is(notNullValue()));
+    }
+
+    /**
+     * Blocks until we can connect to the Cassandra client port (9042).
+     */
+    private void waitForCassandra() {
+        final ContainerAlias alias = ContainerAlias.CASSANDRA;
+        if (!isEnabled(alias)) {
+            return;
+        }
+
+        final InetSocketAddress cassandraAddress = getServiceAddress(alias, 9042);
+        final Callable<Boolean> isConnected = () -> {
+            try {
+                final Socket socket = new Socket(cassandraAddress.getAddress(), cassandraAddress.getPort());
+                socket.setReuseAddress(true);
+                final InputStream is = socket.getInputStream();
+                final OutputStream os = socket.getOutputStream();
+                os.write("¯\\_(ツ)_/¯\n".getBytes());
+                os.close();
+                is.close();
+                socket.close();
+                // good enough, not gonna try to implement the protocol
+                return true;
+            } catch (final Throwable t) {
+                LOG.debug("Cassandra connect failed: " + t.getMessage());
+                return null;
+            }
+        };
+        LOG.info("************************************************************");
+        LOG.info("Waiting for Cassandra service @ {}.", cassandraAddress);
         LOG.info("************************************************************");
         await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(isConnected, is(notNullValue()));
     }

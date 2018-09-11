@@ -281,6 +281,11 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
+    public TestEnvironmentBuilder newts() {
+        m_containers.add(ContainerAlias.CASSANDRA);
+        return this;
+    }
+
     public TestEnvironmentBuilder name(final String name) {
         m_name = name;
         return this;

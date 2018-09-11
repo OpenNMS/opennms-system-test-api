@@ -17,6 +17,9 @@ run docker pull elasticsearch:2-alpine
 run docker pull elasticsearch:5-alpine
 run docker pull docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.3
 
+echo "Pulling cassandra image from public registry"
+run docker pull cassandra:3.11
+
 echo "Building base image"
 run docker build -t stests/base ./base
 
