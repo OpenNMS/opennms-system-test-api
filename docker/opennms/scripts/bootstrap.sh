@@ -44,6 +44,12 @@ wq
 EOF
 fi
 
+# Setup Newts
+if [ ${USE_NEWTS} == "true" ]; then
+    echo "org.opennms.timeseries.strategy=newts" > /opt/opennms/etc/opennms.properties.d/newts.properties
+    echo "org.opennms.newts.config.hostname=cassandra" >> /opt/opennms/etc/opennms.properties.d/newts.properties
+fi
+
 #echo "Editing custom.properties..."
 #ed "${OPENNMS_HOME}/etc/custom.properties" <<EOF
 #/org.opennms.netmgt.snmp;/a
@@ -69,8 +75,15 @@ while ! $(timeout 1 bash -c 'cat < /dev/null > /dev/tcp/$POSTGRES_PORT_5432_TCP_
   fi
 done
 
+# Initialize JRE
+${OPENNMS_HOME}/bin/runjava -s
+
+# Initialize newts
+if [ ${USE_NEWTS} == "true" ]; then
+    ${OPENNMS_HOME}/bin/newts init
+fi
+
 # Start OpenNMS
 rm -rf ${OPENNMS_HOME}/data
-${OPENNMS_HOME}/bin/runjava -s
 ${OPENNMS_HOME}/bin/install -dis
 "${OPENNMS_HOME}/bin/opennms" -f start

@@ -30,4 +30,5 @@ EXPOSE 162/udp 1099 5817 8101 8980 18980 50000/udp 50001/udp 50002/udp 50003/udp
 
 WORKDIR /opt/opennms
 ENV JAVA_HOME /usr/java/latest
+ENV USE_NEWTS false
 CMD ["/opt/opennms/bin/bootstrap.sh"]
