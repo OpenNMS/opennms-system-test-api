@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -74,6 +75,15 @@ public class TestEnvironmentBuilder {
             } catch (final IOException e) {
                 throw new RuntimeException("Failed to copy " + source + " to $OPENNMS_HOME/" + target, e);
             }
+        }
+
+        public EnvironmentBuilder addFile(final Path path, final String target) {
+            try {
+                addFile(path.toFile().toURI().toURL(), target);
+            } catch (MalformedURLException e) {
+                throw new RuntimeException("Provided path " + path.toString() + " cannot be converted to an URL", e);
+            }
+            return this;
         }
 
         public Path build() {
