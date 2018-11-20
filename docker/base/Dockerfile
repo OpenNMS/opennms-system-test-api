@@ -12,8 +12,10 @@ RUN yum -y install  \
 	java-1.7.0-openjdk-devel \
 	http://mirror.internal.opennms.com/yum/develop/common/jdk/x64/jdk-8u144-linux-x64.rpm \
 	openssh-clients \
+	sudo \
 	unzip \
 	wget \
 	which \
 	rsync && \
-	yum -y clean all
+	yum -y clean all && \
+	rm -rf /var/cache/yum
