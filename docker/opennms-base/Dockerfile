@@ -2,7 +2,7 @@ FROM stests/base
 MAINTAINER ranger@opennms.org
 
 # Install OpenNMS dependencies
-RUN yum install -y \
+RUN /usr/local/bin/run-yum.sh install -y \
 	jicmp \
 	jicmp6 \
 	jrrd \
@@ -10,4 +10,4 @@ RUN yum install -y \
 	postgresql \
 	postgresql-server \
 	R && \
-	yum -y clean all
+	/usr/local/bin/clean-yum.sh

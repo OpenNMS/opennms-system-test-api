@@ -6,6 +6,9 @@ run() {
 	"$@"
 }
 
+cp clean-yum.sh run-yum.sh base/
+cp clean-yum.sh run-yum.sh snmpd/
+
 echo "Pulling postgres image from public registry"
 run docker pull postgres:9.5.1
 

@@ -3,9 +3,9 @@ MAINTAINER jesse@opennms.org
 
 ADD /rpms/*.rpm /
 RUN ls -la /*.rpm && \
-	yum install -y /*.rpm && \
+	/usr/local/bin/run-yum.sh install -y /*.rpm && \
 	rm -rf /*.rpm && \
-	yum -y clean all
+	/usr/local/bin/clean-yum.sh
 
 COPY etc     /opt/minion/etc
 COPY scripts /opt/minion/bin
