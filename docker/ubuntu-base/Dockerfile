@@ -110,5 +110,4 @@ RUN apt-get update && \
 #	wget \
 #	which \
 #	rsync && \
-#	yum -y clean all && \
-#       rm -rf /var/cache/yum
+#	yum -y clean all

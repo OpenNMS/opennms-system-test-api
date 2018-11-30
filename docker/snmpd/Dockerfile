@@ -1,8 +1,7 @@
 FROM centos:7
 MAINTAINER jesse@opennms.org
 
-COPY clean-yum.sh run-yum.sh /usr/local/bin/
-RUN /usr/local/bin/run-yum.sh install -y net-snmp && /usr/local/bin/clean-yum.sh
+RUN yum install -y net-snmp && yum clean all && rm -rf /var/cache/yum
 
 COPY etc /etc
 COPY scripts/bootstrap.sh /
