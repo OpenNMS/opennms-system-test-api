@@ -7,7 +7,7 @@ if [ -z "$DIG" ]; then
 	yum --quiet -y install bind-utils || exit 1
 fi
 
-if [ "$(dig "$PROXY_HOST" +short  | grep -c -E '^172.20')" -gt 0 ] && false; then
+if [ "$(dig "$PROXY_HOST" +short  | grep -c -E '^172.20')" -gt 0 ]; then
 	echo "Using proxy host: ${PROXY_HOST}"
 	if [ -e /etc/yum/pluginconf.d/fastestmirror.conf ] && [ "$(grep -c "enabled=1" /etc/yum/pluginconf.d/fastestmirror.conf)" -gt 0 ]; then
 		echo "* disabling fastestmirror plugin to avoid getting different mirrors every time"
