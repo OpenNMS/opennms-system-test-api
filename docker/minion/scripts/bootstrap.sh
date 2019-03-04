@@ -4,11 +4,11 @@ MINION_HOME=/opt/minion
 echo "MINION HOME: ${MINION_HOME}"
 
 # Expose the Karaf shell
-sed -i s/sshHost.*/sshHost=0.0.0.0/g "${MINION_HOME}/etc/org.apache.karaf.shell.cfg"
+sed -i "/^sshHost/s/=.*/= 0.0.0.0/" ${MINION_HOME}/etc/org.apache.karaf.shell.cfg
 
 # Expose the RMI registry and server
-sed -i s/rmiRegistryHost.*/rmiRegistryHost=0.0.0.0/g "${MINION_HOME}/etc/org.apache.karaf.management.cfg"
-sed -i s/rmiServerHost.*/rmiServerHost=0.0.0.0/g "${MINION_HOME}/etc/org.apache.karaf.management.cfg"
+sed -i "/^rmiRegistryHost/s/=.*/= 0.0.0.0/" ${MINION_HOME}/etc/org.apache.karaf.management.cfg
+sed -i "/^rmiServerHost/s/=.*/= 0.0.0.0/" ${MINION_HOME}/etc/org.apache.karaf.management.cfg
 
 echo "location = ${MINION_LOCATION:=MINION}" > $MINION_HOME/etc/org.opennms.minion.controller.cfg
 echo "id = ${MINION_ID:=00000000-0000-0000-0000-000000ddba11}" >> $MINION_HOME/etc/org.opennms.minion.controller.cfg

@@ -4,11 +4,11 @@ SENTINEL_HOME=/opt/sentinel
 echo "SENTINEL HOME: ${SENTINEL_HOME}"
 
 # Expose the Karaf shell
-sed -i s/sshHost.*/sshHost=0.0.0.0/g "${SENTINEL_HOME}/etc/org.apache.karaf.shell.cfg"
+sed -i "/^sshHost/s/=.*/= 0.0.0.0/" ${SENTINEL_HOME}/etc/org.apache.karaf.shell.cfg
 
 # Expose the RMI registry and server
-sed -i s/rmiRegistryHost.*/rmiRegistryHost=0.0.0.0/g "${SENTINEL_HOME}/etc/org.apache.karaf.management.cfg"
-sed -i s/rmiServerHost.*/rmiServerHost=0.0.0.0/g "${SENTINEL_HOME}/etc/org.apache.karaf.management.cfg"
+sed -i "/^rmiRegistryHost/s/=.*/= 0.0.0.0/" ${SENTINEL_HOME}/etc/org.apache.karaf.management.cfg
+sed -i "/^rmiServerHost/s/=.*/= 0.0.0.0/" ${SENTINEL_HOME}/etc/org.apache.karaf.management.cfg
 
 # Configure basic connection to opennms
 echo "http-url = http://${OPENNMS_PORT_8980_TCP_ADDR}:${OPENNMS_PORT_8980_TCP_PORT}/opennms" >> ${SENTINEL_HOME}/etc/org.opennms.sentinel.controller.cfg

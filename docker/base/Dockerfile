@@ -16,6 +16,7 @@ RUN yum -y install  \
 	unzip \
 	wget \
 	which \
+	net-tools \
 	rsync && \
 	yum -y clean all && \
 	rm -rf /var/cache/yum
