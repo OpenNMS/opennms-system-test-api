@@ -32,6 +32,9 @@ if [ -d /sentinel-docker-overlay/ ]; then
 	rsync -ar /sentinel-docker-overlay/ "${SENTINEL_HOME}"/
 fi
 
+# Ensure everything is owned by the sentinel user
+chown -R sentinel:sentinel "${SENTINEL_HOME}"
+
 find "${SENTINEL_HOME}/data" -type d | grep -vE "(data|data/log)$" | sort -ur | while read DIR; do
 	rm -rf "$DIR"
 done

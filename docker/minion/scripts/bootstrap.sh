@@ -33,6 +33,9 @@ if [ -d /minion-docker-overlay/ ]; then
 	rsync -ar /minion-docker-overlay/ "${MINION_HOME}"/
 fi
 
+# Ensure everything is owned by the minion user
+chown -R minion:minion "${MINION_HOME}"
+
 find "${MINION_HOME}/data" -type d | grep -vE "(data|data/log)$" | sort -ur | while read DIR; do
 	rm -rf "$DIR"
 done
