@@ -125,7 +125,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         OPENNMS,
         POSTGRES,
         SNMPD,
-        CASSANDRA
+        CASSANDRA,
+        FIREFOX
     }
 
     @SuppressWarnings("serial")
@@ -161,6 +162,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
             .put(ContainerAlias.SNMPD, "polinux/snmpd:alpine")
             .put(ContainerAlias.CASSANDRA, "cassandra:3.11")
+            .put(ContainerAlias.FIREFOX, "selenium/standalone-firefox-debug:3.141.59")
             .build();
 
     /**
@@ -254,6 +256,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnOpenNMS();
         spawnSnmpd();
         spawnMinions();
+        maybeSpawnFirefox();
 
         LOG.debug("Waiting for other containers to be ready: {}", start);
 
@@ -266,6 +269,8 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         waitForSnmpd();
         waitForMinions();
         waitForSentinel();
+
+        maybeWaitForFirefox();
     }
 
     @Override
@@ -785,6 +790,23 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         }
     }
 
+    private void maybeSpawnFirefox() throws InterruptedException, DockerException, IOException {
+        final ContainerAlias alias = ContainerAlias.FIREFOX;
+        if (!isEnabled(alias) && isSpawned(alias)) {
+            return;
+        }
+        final List<String> env = Collections.emptyList();
+
+        final List<String> links = Lists.newArrayList();
+        if (isEnabled(ContainerAlias.OPENNMS)) {
+            links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
+        }
+        final Builder builder = HostConfig.builder()
+                .publishAllPorts(true)
+                .links(links);
+        spawnContainer(alias, builder, env);
+    }
+
     private Path initializeOverlayRoot(final ContainerAlias alias) {
         final Path overlayRoot = Paths.get("target", "overlays", getName(), alias.toString()).toAbsolutePath();
 
@@ -1022,6 +1044,39 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> canMinionConnectToOpenNMS(sshAddr));
             await().atMost(5, MINUTES).pollInterval(5, SECONDS).until(() -> listFeatures(sshAddr, true));
         }
+    }
+
+    /**
+     * Blocks until we can connect to the Firefox WebDriver port (4444).
+     */
+    private void maybeWaitForFirefox() {
+        final ContainerAlias alias = ContainerAlias.FIREFOX;
+        if (!isEnabled(alias)) {
+            return;
+        }
+
+        final InetSocketAddress webDriverAddr = getServiceAddress(alias, 4444);
+        final Callable<Boolean> isConnected = () -> {
+            try {
+                final Socket socket = new Socket(webDriverAddr.getAddress(), webDriverAddr.getPort());
+                socket.setReuseAddress(true);
+                final InputStream is = socket.getInputStream();
+                final OutputStream os = socket.getOutputStream();
+                os.write("¯\\_(ツ)_/¯\n".getBytes());
+                os.close();
+                is.close();
+                socket.close();
+                // good enough, not gonna try to implement the protocol
+                return true;
+            } catch (final Throwable t) {
+                LOG.debug("Cassandra connect failed: " + t.getMessage());
+                return null;
+            }
+        };
+        LOG.info("************************************************************");
+        LOG.info("Waiting for Firefox service @ {}.", webDriverAddr);
+        LOG.info("************************************************************");
+        await().atMost(5, MINUTES).pollInterval(10, SECONDS).until(isConnected, is(notNullValue()));
     }
 
     public boolean canMinionConnectToOpenNMS(InetSocketAddress sshAddr) {

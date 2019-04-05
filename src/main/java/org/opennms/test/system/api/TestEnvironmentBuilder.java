@@ -290,6 +290,11 @@ public class TestEnvironmentBuilder {
         return this;
     }
 
+    public TestEnvironmentBuilder firefox() {
+        m_containers.add(ContainerAlias.FIREFOX);
+        return this;
+    }
+
     public TestEnvironmentBuilder name(final String name) {
         m_name = name;
         return this;
