@@ -125,7 +125,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         OPENNMS,
         POSTGRES,
         SNMPD,
-        TOMCAT,
         CASSANDRA
     }
 
@@ -154,14 +153,13 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             .put(ContainerAlias.ELASTICSEARCH_5, "elasticsearch:5-alpine")
             .put(ContainerAlias.ELASTICSEARCH_6, "docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.3")
             .put(ContainerAlias.KAFKA, "spotify/kafka@sha256:cf8f8f760b48a07fb99df24fab8201ec8b647634751e842b67103a25a388981b")
-            .put(ContainerAlias.MINION, "stests/minion")
-            .put(ContainerAlias.MINION_SAME_LOCATION, "stests/minion")
-            .put(ContainerAlias.MINION_OTHER_LOCATION, "stests/minion")
-            .put(ContainerAlias.SENTINEL, "stests/sentinel")
-            .put(ContainerAlias.OPENNMS, "stests/opennms")
+            .put(ContainerAlias.MINION, "minion")
+            .put(ContainerAlias.MINION_SAME_LOCATION, "minion")
+            .put(ContainerAlias.MINION_OTHER_LOCATION, "minion")
+            .put(ContainerAlias.SENTINEL, "sentinel")
+            .put(ContainerAlias.OPENNMS, "horizon")
             .put(ContainerAlias.POSTGRES, "postgres:9.5.1")
-            .put(ContainerAlias.SNMPD, "stests/snmpd")
-            .put(ContainerAlias.TOMCAT, "stests/tomcat")
+            .put(ContainerAlias.SNMPD, "polinux/snmpd:alpine")
             .put(ContainerAlias.CASSANDRA, "cassandra:3.11")
             .build();
 
@@ -255,7 +253,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
         spawnOpenNMS();
         spawnSnmpd();
-        spawnTomcat();
         spawnMinions();
 
         LOG.debug("Waiting for other containers to be ready: {}", start);
@@ -267,7 +264,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         spawnSentinel();
 
         waitForSnmpd();
-        waitForTomcat();
         waitForMinions();
         waitForSentinel();
     }
@@ -590,7 +586,17 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         binds.add(opennmsKarafLogs.toString() + ":/opt/opennms/data/log");
 
         final List<String> links = new ArrayList<>();
-        links.add(String.format("%s:postgres", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
+        links.add(String.format("%s:database", containerInfoByAlias.get(ContainerAlias.POSTGRES).name()));
+        env.add("POSTGRES_HOST=database");
+        env.add("POSTGRES_PORT=5432");
+        env.add("POSTGRES_USER=postgres");
+        env.add("POSTGRES_PASSWORD=postgres");
+
+        env.add("OPENNMS_DBNAME=opennms");
+        env.add("OPENNMS_DBUSER=opennms");
+        env.add("OPENNMS_DBPASS=opennms");
+        env.add("OPENNMS_HOME=/opt/opennms");
+        env.add("OPENNMS_DB_CONFIG=/opt/opennms/etc/opennms-datasources.xml");
 
         // Link to the Elasticsearch container, if enabled
         if (isEnabled(ContainerAlias.ELASTICSEARCH_2)) {
@@ -615,7 +621,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                 .links(links)
                 .binds(binds);
 
-        spawnContainer(alias, builder, env);
+        spawnContainer(alias, builder, env, "-s");
     }
 
     /**
@@ -700,18 +706,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     }
 
     /**
-     * Spawns the Tomcat container.
-     */
-    private void spawnTomcat() throws DockerException, InterruptedException, IOException {
-        final ContainerAlias alias = ContainerAlias.TOMCAT;
-        if (!(isEnabled(alias) && isSpawned(alias))) {
-            return;
-        }
-
-        spawnContainer(alias, HostConfig.builder(), Collections.emptyList());
-    }
-
-    /**
      * Spawns the cassandra container.
      */
     private void spawnCassandra() throws InterruptedException, DockerException, IOException {
@@ -774,9 +768,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
             if (isEnabled(ContainerAlias.SNMPD)) {
                 links.add(String.format("%s:snmpd", containerInfoByAlias.get(ContainerAlias.SNMPD).name()));
             }
-            if (isEnabled(ContainerAlias.TOMCAT)) {
-                links.add(String.format("%s:tomcat", containerInfoByAlias.get(ContainerAlias.TOMCAT).name()));
-            }
             if (isEnabled(ContainerAlias.KAFKA)) {
                 links.add(String.format("%s:kafka", containerInfoByAlias.get(ContainerAlias.KAFKA).name()));
             }
@@ -827,13 +818,14 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
     /**
      * Spawns a container.
      */
-    private void spawnContainer(final ContainerAlias alias, final Builder hostConfigBuilder, final List<String> env) throws DockerException, InterruptedException, IOException {
+    private void spawnContainer(final ContainerAlias alias, final Builder hostConfigBuilder, final List<String> env, String... cmd) throws DockerException, InterruptedException, IOException {
         final HostConfig hostConfig = hostConfigBuilder.build();
         final ContainerConfig containerConfig = ContainerConfig.builder()
                 .image(IMAGES_BY_ALIAS.get(alias))
                 .hostConfig(hostConfig)
                 .hostname(getName() + ".local")
                 .env(env)
+                .cmd(cmd)
                 .exposedPorts(hostConfig.portBindings() != null ? hostConfig.portBindings().keySet() : Collections.emptySet())
                 .build();
 
@@ -992,17 +984,6 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
      */
     private void waitForSnmpd() throws Exception {
         final ContainerAlias alias = ContainerAlias.SNMPD;
-        if (!isEnabled(alias)) {
-            return;
-        }
-
-    }
-
-    /**
-     * TODO: Blocks until the Tomcat HTTP daemon is available.
-     */
-    private void waitForTomcat() throws Exception {
-        final ContainerAlias alias = ContainerAlias.TOMCAT;
         if (!isEnabled(alias)) {
             return;
         }

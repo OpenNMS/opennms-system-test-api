@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.opennms.test</groupId>
   <artifactId>org.opennms.test.system-api</artifactId>
-  <version>1-SNAPSHOT</version>
+  <version>3-SNAPSHOT</version>
   <name>OpenNMS System Test API</name>
   <description>Full stack testing of OpenNMS.</description>
 

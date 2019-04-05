@@ -184,7 +184,6 @@ public class TestEnvironmentBuilder {
         // if it is available
         //sentinel();
         snmpd();
-        tomcat();
 
         return this;
     }
@@ -283,11 +282,6 @@ public class TestEnvironmentBuilder {
             return this;
         }
         m_containers.add(ContainerAlias.SNMPD);
-        return this;
-    }
-
-    public TestEnvironmentBuilder tomcat() {
-        m_containers.add(ContainerAlias.TOMCAT);
         return this;
     }
 
