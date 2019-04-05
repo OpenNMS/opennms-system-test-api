@@ -795,8 +795,10 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         if (!isEnabled(alias) && isSpawned(alias)) {
             return;
         }
-        final List<String> env = Collections.emptyList();
-
+        final List<String> env = Arrays.asList(
+                "SCREEN_WIDTH=2048",
+                "SCREEN_HEIGHT=1600"
+        );
         final List<String> links = Lists.newArrayList();
         if (isEnabled(ContainerAlias.OPENNMS)) {
             links.add(String.format("%s:opennms", containerInfoByAlias.get(ContainerAlias.OPENNMS).name()));
