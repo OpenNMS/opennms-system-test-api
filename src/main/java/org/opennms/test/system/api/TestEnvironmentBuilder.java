@@ -144,6 +144,10 @@ public class TestEnvironmentBuilder {
                 throw new RuntimeException("Failed to create opt-in enabled="+m_optIn+" file in $OPENNMS_HOME/etc!", e);
             }
 
+            // Always include opennms-activemq.xml
+            // FIXME: What if the user wants to overwrite this?
+            addFile(TestEnvironmentBuilder.class.getResource("etc/opennms-activemq.xml"), "etc/opennms-activemq.xml");
+
             return super.build();
         }
 

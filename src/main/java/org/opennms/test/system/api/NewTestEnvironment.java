@@ -586,7 +586,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
         final List<String> env = new ArrayList<>();
 
         final List<String> binds = new ArrayList<>();
-        binds.add(opennmsOverlay.toString() + ":/opennms-docker-overlay");
+        binds.add(opennmsOverlay.toString() + ":/opt/opennms-overlay");
         binds.add(opennmsLogs.toString() + ":/var/log/opennms");
         binds.add(opennmsKarafLogs.toString() + ":/opt/opennms/data/log");
 
@@ -764,7 +764,7 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
 
             final List<String> binds = new ArrayList<>();
             binds.add(minionOverlay.toString() + ":/minion-docker-overlay");
-            binds.add(minionKarafLogs.toString() + ":/opt/minion/data/log");
+            // binds.add(minionKarafLogs.toString() + ":/opt/minion/data/log"); - mkdir: cannot create directory '/opt/minion/data/tmp': Permission denied
 
             final List<String> links = Lists.newArrayList();
             if (isEnabled(ContainerAlias.OPENNMS)) {
@@ -783,10 +783,16 @@ public class NewTestEnvironment extends AbstractTestEnvironment implements TestE
                     .binds(binds);
 
             final List<String> env = Arrays.asList(
-                                                   "MINION_LOCATION=" + MINION_LOCATIONS.get(alias),
-                                                   "MINION_ID=" + MINION_IDS.get(alias)
+                    "MINION_LOCATION=" + MINION_LOCATIONS.get(alias),
+                    "MINION_ID=" + MINION_IDS.get(alias),
+                    "OPENNMS_BROKER_URL=failover:tcp://opennms:61616",
+                    "OPENNMS_HTTP_URL=http://opennms:8980/opennms",
+                    "OPENNMS_HTTP_USER=admin",
+                    "OPENNMS_HTTP_PASS=admin",
+                    "OPENNMS_BROKER_USER=admin",
+                    "OPENNMS_BROKER_PASS=admin"
                     );
-            spawnContainer(alias, builder, env);
+            spawnContainer(alias, builder, env, "-c");
         }
     }
 
