@@ -1,6 +1,16 @@
 #!/bin/bash -ex
 SENTINEL_HOME=/opt/sentinel
 
+if [ ! -e "$JAVA_HOME" ]; then
+	for DIR in /usr/lib/jvm/jre /usr/lib/jvm/java; do
+		if [ -e "$DIR" ] && [ -x "$DIR/bin/java" ]; then
+			export JAVA_HOME="$DIR"
+		fi
+	done
+fi
+echo "JAVA HOME: ${JAVA_HOME}"
+echo "JAVA VERSION: $("$JAVA_HOME/bin/java" -version)"
+
 echo "SENTINEL HOME: ${SENTINEL_HOME}"
 
 # Expose the Karaf shell
