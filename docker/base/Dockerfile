@@ -9,8 +9,8 @@ RUN yum install -y epel-release deltarpm http://yum.opennms.org/repofiles/opennm
 
 RUN yum -y install  \
 	ed \
-	java-1.7.0-openjdk-devel \
-	http://mirror.internal.opennms.com/yum/develop/common/jdk/x64/jdk-8u181-linux-x64.rpm \
+	http://mirror.internal.opennms.com/yum/develop/common/jdk/x64/jdk-8u211-linux-x64.rpm \
+	java-11-openjdk-devel \
 	openssh-clients \
 	sudo \
 	unzip \
